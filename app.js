@@ -1,4 +1,4 @@
-const VERSION = "1.2.0";
+const VERSION = "1.2.1";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -82,9 +82,10 @@ async function testKeys() {
 
 /* ---------- Script generation ---------- */
 async function imgB64(file, max = 1024, q = .85) {
-  const b = await createImageBitmap(file), s = Math.min(1, max / Math.max(b.width, b.height));
+  const b = await createImageBitmap(file).catch(() => createImageBitmap(file, { resizeWidth: max })), s = Math.min(1, max / Math.max(b.width, b.height));
   const c = document.createElement("canvas"); c.width = b.width * s; c.height = b.height * s;
   c.getContext("2d").drawImage(b, 0, 0, c.width, c.height);
+  b.close && b.close();
   return c.toDataURL("image/jpeg", q).split(",")[1];
 }
 function buildPrompt(f, hasImg) {
@@ -141,6 +142,19 @@ function renderGallery(srcs, descs = []) {
   $("#gallery").innerHTML = srcs.map((s, i) => `<figure><img src="${s}" alt=""><b style="background:${COLORS[i % 6]}">#${i + 1}</b><figcaption>${esc(descs[i] || "")}</figcaption></figure>`).join("");
 }
 const refsHtml = s => (s.refs && s.refs.length) ? `<div class="refs">ارفع كمرجع في Flow: ${s.refs.map(r => `<span class="tag" style="background:${COLORS[(r - 1) % 6]}">#${r}</span>`).join(" ")}</div>` : "";
+
+const BROKEN = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><rect width='96' height='96' fill='%232a3541'/></svg>";
+async function previewFiles(fl) {
+  const all = [...fl], list = all.slice(0, 6), srcs = [], bad = [];
+  $("#gallery").innerHTML = ""; msg("جاري تحضير " + list.length + " صورة…");
+  for (const f of list) {
+    try { srcs.push("data:image/jpeg;base64," + await imgB64(f, 240, .7)); } catch (e) { srcs.push(BROKEN); bad.push(f.name); }
+    renderGallery(srcs);
+  }
+  let t = "تم اختيار " + all.length + " صورة" + (all.length > 6 ? " (ستُستعمل أول 6)" : "");
+  if (bad.length) t += " — تعذر قراءة: " + bad.join("، ");
+  msg(t, bad.length > 0); if (!bad.length) setTimeout(() => msg(""), 2500);
+}
 
 /* ---------- Voice ---------- */
 function wav(pcm, sr = 24000) {
@@ -279,7 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
   initModels(); renderProjects(); navigator.storage?.persist?.();
   $("#btnNew").onclick = newProject;
-  $("#img").onchange = e => { const fs = [...e.target.files]; if (fs.length > 6) msg("الحد الأقصى 6 صور، ستُستعمل أول 6 فقط.", true); renderGallery(fs.slice(0, 6).map(x => URL.createObjectURL(x))); };
+  $("#img").onchange = e => previewFiles(e.target.files);
   $("#projects").addEventListener("click", async e => {
     const d = e.target.dataset;
     if (d.open) openProject(d.open);
