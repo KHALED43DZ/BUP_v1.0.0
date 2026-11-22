@@ -1,5 +1,6 @@
 :root{--bg:#11161b;--panel:#19212a;--line:#2a3541;--ink:#eef2f0;--mut:#92a09b;--g:#22b573;--r:#e5483f}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 Cairo,Tahoma,"Segoe UI",system-ui,sans-serif}
 header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border-bottom:2px solid var(--g)}
 h1{margin:0;font-size:1.35rem;font-weight:800;flex:1}

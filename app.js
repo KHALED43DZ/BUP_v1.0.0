@@ -1,4 +1,4 @@
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -170,6 +170,7 @@ async function preview() {
 }
 
 /* ---------- Merge ---------- */
+const errText = e => (e && e.message) || (typeof e === "string" ? e : (() => { try { return JSON.stringify(e); } catch { return String(e); } })()) || "خطأ غير معروف";
 const loadScript = src => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("تعذر تحميل " + src)); document.head.appendChild(s); });
 async function loadFF() {
   if (ff) return ff;
@@ -177,7 +178,7 @@ async function loadFF() {
   msg("تحميل أداة الدمج (مرة واحدة، حوالي 30 ميغابايت)…");
   await loadScript(cdn + "@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js");
   await loadScript(cdn + "@ffmpeg/util@0.12.1/dist/umd/index.js");
-  const { toBlobURL } = FFmpegUtil, core = cdn + "@ffmpeg/core@0.12.6/dist/umd/";
+  const { toBlobURL } = FFmpegUtil, core = cdn + "@ffmpeg/core@0.12.6/dist/esm/";
   const f = new FFmpegWASM.FFmpeg();
   f.on("progress", ({ progress }) => msg("جاري الدمج… " + Math.round(Math.min(1, Math.max(0, progress)) * 100) + "%"));
   await f.load({
@@ -212,7 +213,7 @@ async function merge() {
     $("#out").src = url; $("#out").hidden = false; $("#out-dl").href = url; $("#out-dl").hidden = false;
     for (let i = 0; i < clips.length; i++) await f.deleteFile(`c${i}.mp4`).catch(() => { });
     msg("تم الدمج.");
-  } catch (e) { msg("خطأ في الدمج: " + e.message, true); }
+  } catch (e) { msg("خطأ في الدمج: " + errText(e), true); }
   $("#btnMerge").disabled = false;
 }
 
