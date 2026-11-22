@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BUP – صانع الإعلانات</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#11161b">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <button id="btnSet" class="icon" aria-label="الإعدادات">⚙</button>
+  <h1>BUP <small>إعلانات بالدارجة الجزائرية</small></h1>
+  <span class="ver" id="ver"></span>
+</header>
+<div id="status" role="status" hidden></div>
+<main>
+<section>
+  <h2>1. المنتج</h2>
+  <label>اسم المنتج أو الخدمة<input id="name"></label>
+  <label>وصف قصير ومميزاته<textarea id="desc" rows="3"></textarea></label>
+  <label>الجمهور المستهدف<input id="aud" placeholder="مثال: شباب، ربات البيوت، أصحاب المحلات"></label>
+  <label>العرض / الدعوة لاتخاذ إجراء<input id="offer" placeholder="مثال: التوصيل لـ 58 ولاية، السعر 2500 دج، اتصل على 05..."></label>
+  <label>صورة المنتج (اختياري، يحلل Gemini شكله)<input id="img" type="file" accept="image/*"></label>
+  <div class="grid">
+    <label>نوع الإعلان<select id="type"><option value="physical product">منتج</option><option value="service">خدمة</option><option value="restaurant / food">مطعم وأكل</option><option value="mobile app">تطبيق</option><option value="real estate">عقار</option><option value="fashion / clothing">ملابس وموضة</option><option value="beauty / cosmetics">تجميل</option></select></label>
+    <label>اللغة<select id="lang"><option value="darija">الدارجة الجزائرية</option><option value="mix">دارجة + فرنسية</option><option value="fusha">الفصحى</option></select></label>
+    <label>النبرة<select id="tone"><option value="energetic">حماسي</option><option value="luxury">فاخر</option><option value="funny">فكاهي</option><option value="emotional">عاطفي</option><option value="urgent limited offer">عاجل</option></select></label>
+    <label>الأسلوب البصري<select id="style"><option value="cinematic commercial">سينمائي</option><option value="UGC handheld authentic">UGC عفوي</option><option value="minimal clean studio">بسيط ونظيف</option><option value="vibrant colorful">ألوان زاهية</option></select></label>
+    <label>الأشخاص<select id="people"><option value="with people">مع أشخاص</option><option value="no people, product only">المنتج فقط</option></select></label>
+    <label>الصيغة<select id="ratio"><option>9:16</option><option>16:9</option><option>1:1</option></select></label>
+    <label>المدة<select id="dur"><option value="10">10 ثوانٍ</option><option value="20" selected>20 ثانية</option><option value="30">30 ثانية</option><option value="40">40 ثانية</option></select></label>
+    <label>الصوت<select id="voice"></select></label>
+  </div>
+  <div class="row"><button id="btnGen" class="main">أنشئ السيناريو والبرومبتات</button><button id="btnPrev">تجربة الصوت</button></div>
+</section>
+
+<section id="secRes" hidden>
+  <h2>2. اللقطات</h2>
+  <p class="mut">انسخ كل برومبت إلى Flow وولّد لقطة من 10 ثوانٍ بنفس الترتيب.</p>
+  <div id="shots"></div>
+  <div class="row"><button id="btnCopyAll">نسخ كل البرومبتات</button></div>
+  <p id="cap" class="mut"></p>
+</section>
+
+<section id="secAud" hidden>
+  <h2>3. التعليق الصوتي</h2>
+  <div class="row"><button id="btnAud" class="main">ولّد الصوت</button></div>
+  <audio id="aud-el" controls hidden></audio>
+  <a id="aud-dl" class="btn" hidden download="voice.wav">تحميل الصوت</a>
+  <p id="aud-info" class="mut"></p>
+</section>
+
+<section id="secMerge" hidden>
+  <h2>4. الدمج</h2>
+  <label>مقاطع Flow (mp4)<input id="clips" type="file" accept="video/*" multiple></label>
+  <ol id="clipList"></ol>
+  <div class="row"><button id="btnMerge" class="main">ادمج الفيديو مع الصوت</button></div>
+  <video id="out" controls playsinline hidden></video>
+  <a id="out-dl" class="btn" hidden download="ad.mp4">تحميل الإعلان</a>
+</section>
+</main>
+
+<dialog id="dlg">
+  <h2>الإعدادات</h2>
+  <label>مفاتيح التحليل والبرومبتات (مفتاح في كل سطر)<textarea id="kText" rows="4" dir="ltr"></textarea></label>
+  <label>مفاتيح الصوت (مفتاح في كل سطر)<textarea id="kAudio" rows="4" dir="ltr"></textarea></label>
+  <div class="row"><button id="btnTest">اختبار المفاتيح</button><button id="btnModels">جلب النماذج</button></div>
+  <div id="testOut" class="mut"></div>
+  <label>نموذج النص<select id="mText"></select></label>
+  <label>نموذج الصوت<select id="mTTS"></select></label>
+  <p class="mut">المفاتيح تُحفظ في متصفحك فقط. عند تجاوز الحصة ينتقل التطبيق للمفتاح التالي تلقائياً.</p>
+  <div class="row"><button id="btnSave" class="main">حفظ وإغلاق</button></div>
+</dialog>
+<script src="app.js"></script>
+</body>
+</html>
