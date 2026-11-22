@@ -32,3 +32,10 @@ dialog::backdrop{background:#000a}
 #clipList button{padding:0 8px;margin-inline-start:4px}
 .ok{color:var(--g)}.bad{color:var(--r)}
 @media(max-width:480px){.grid{grid-template-columns:1fr}}
+.between{justify-content:space-between;align-items:center;margin:0 0 10px}.between h2{margin:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.card.on{border-color:var(--g)}
+.card img,.card .ph{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:6px;background:var(--line);display:grid;place-items:center;color:var(--g)}
+.card b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .row{margin-top:auto}.card button{padding:4px 10px;font-size:.85rem}

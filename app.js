@@ -1,4 +1,4 @@
-const VERSION = "1.0.1";
+const VERSION = "1.1.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -81,11 +81,11 @@ async function testKeys() {
 }
 
 /* ---------- Script generation ---------- */
-async function imgB64(file) {
-  const b = await createImageBitmap(file), s = Math.min(1, 1024 / Math.max(b.width, b.height));
+async function imgB64(file, max = 1024, q = .85) {
+  const b = await createImageBitmap(file), s = Math.min(1, max / Math.max(b.width, b.height));
   const c = document.createElement("canvas"); c.width = b.width * s; c.height = b.height * s;
   c.getContext("2d").drawImage(b, 0, 0, c.width, c.height);
-  return c.toDataURL("image/jpeg", .85).split(",")[1];
+  return c.toDataURL("image/jpeg", q).split(",")[1];
 }
 function buildPrompt(f, hasImg) {
   const n = f.dur / 10;
@@ -117,7 +117,9 @@ async function generate() {
     const j = await withKeys("kText", k => gem(`models/${model}:generateContent`, { contents: [{ parts }], generationConfig: { responseMimeType: "application/json", temperature: .9 } }, k));
     const txt = j.candidates[0].content.parts.map(p => p.text || "").join("").replace(/```json|```/g, "").trim();
     const d = JSON.parse(txt);
-    shots = d.shots; renderShots(d); msg("");
+    shots = d.shots; audioBlob = null; resetAudioUI();
+    cur = { id: Date.now().toString(36), created: Date.now(), name: f.name, caption: d.caption || "", thumb: file ? await imgB64(file, 200, .7) : "", voice: $("#voice").value, form: Object.fromEntries(FIELDS.map(k => [k, $("#" + k).value])) };
+    await saveCur(); renderShots(d); renderProjects(); msg("");
   } catch (e) { msg("تعذر الإنشاء: " + e.message, true); }
   $("#btnGen").disabled = false;
 }
@@ -156,9 +158,7 @@ async function genAudio() {
   $("#btnAud").disabled = true; msg("جاري توليد الصوت…");
   try {
     audioBlob = await tts(shots.map(s => s.voiceover).join("\n"));
-    const url = URL.createObjectURL(audioBlob), a = $("#aud-el");
-    a.src = url; a.hidden = false; $("#aud-dl").href = url; $("#aud-dl").hidden = false;
-    a.onloadedmetadata = () => $("#aud-info").textContent = `مدة الصوت ${a.duration.toFixed(1)} ث، ومدة الفيديو المتوقعة ${shots.length * 10} ث.` + (a.duration > shots.length * 10 ? " الصوت أطول من الفيديو وسيُقص، اختصر النص." : "");
+    showAudio(); cur && (cur.voice = $("#voice").value); await saveCur(); renderProjects();
     msg("");
   } catch (e) { msg("تعذر توليد الصوت: " + e.message, true); }
   $("#btnAud").disabled = false;
@@ -217,6 +217,50 @@ async function merge() {
   $("#btnMerge").disabled = false;
 }
 
+/* ---------- Projects ---------- */
+let cur = null, saveT;
+const FIELDS = ["name", "desc", "aud", "offer", "type", "lang", "tone", "style", "people", "ratio", "dur"];
+const LN = { darija: "دارجة", mix: "دارجة + فرنسية", fusha: "فصحى" };
+const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
+const DB = {
+  open() { return this.p || (this.p = new Promise((ok, no) => { const r = indexedDB.open("bup", 1); r.onupgradeneeded = () => r.result.createObjectStore("p", { keyPath: "id" }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); })); },
+  async tx(m, f) { const d = await this.open(); return new Promise((ok, no) => { const t = d.transaction("p", m), q = f(t.objectStore("p")); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); }); },
+  all() { return this.tx("readonly", s => s.getAll()); }, get(id) { return this.tx("readonly", s => s.get(id)); },
+  put(p) { return this.tx("readwrite", s => s.put(p)); }, del(id) { return this.tx("readwrite", s => s.delete(id)); }
+};
+async function saveCur() {
+  if (!cur) return;
+  cur.shots = shots; cur.audio = audioBlob; cur.updated = Date.now();
+  try { await DB.put(cur); } catch (e) { msg("تعذر حفظ المشروع: " + errText(e), true); }
+}
+const saveSoon = () => { clearTimeout(saveT); saveT = setTimeout(saveCur, 700); };
+function resetAudioUI() { $("#aud-el").hidden = true; $("#aud-dl").hidden = true; $("#aud-info").textContent = ""; }
+function showAudio() {
+  const url = URL.createObjectURL(audioBlob), a = $("#aud-el");
+  a.src = url; a.hidden = false; $("#aud-dl").href = url; $("#aud-dl").hidden = false;
+  a.onloadedmetadata = () => $("#aud-info").textContent = `مدة الصوت ${a.duration.toFixed(1)} ث، ومدة الفيديو المتوقعة ${shots.length * 10} ث.` + (a.duration > shots.length * 10 ? " الصوت أطول من الفيديو وسيُقص، اختصر النص." : "");
+}
+async function renderProjects() {
+  const list = ((await DB.all()) || []).sort((x, y) => y.updated - x.updated);
+  $("#projects").innerHTML = list.length ? list.map(p => `<div class="card${cur && cur.id === p.id ? " on" : ""}">
+    ${p.thumb ? `<img src="data:image/jpeg;base64,${p.thumb}" alt="">` : `<div class="ph">▶</div>`}
+    <b>${esc(p.name)}</b><span class="mut">${p.shots.length * 10} ث · ${LN[p.form.lang] || ""} · ${new Date(p.updated).toLocaleDateString("fr-FR")}${p.audio ? " · 🔊" : ""}</span>
+    <div class="row"><button data-open="${p.id}">فتح</button><button data-del="${p.id}">حذف</button></div></div>`).join("")
+    : `<p class="mut">لا توجد مشاريع بعد. أول إعلان تنشئه سيُحفظ هنا تلقائياً.</p>`;
+}
+async function openProject(id) {
+  const p = await DB.get(id); if (!p) return;
+  cur = p; shots = p.shots; audioBlob = p.audio || null;
+  FIELDS.forEach(k => $("#" + k).value = p.form[k]); if (p.voice) $("#voice").value = p.voice;
+  resetAudioUI(); renderShots({ caption: p.caption }); if (audioBlob) showAudio(); renderProjects();
+}
+function newProject() {
+  cur = null; shots = []; audioBlob = null; resetAudioUI();
+  FIELDS.forEach(k => { const e = $("#" + k); if (e.tagName !== "SELECT") e.value = ""; });
+  $("#img").value = ""; ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = true);
+  renderProjects(); window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 /* ---------- Events ---------- */
 document.addEventListener("DOMContentLoaded", () => {
   $("#ver").textContent = "الإصدار " + VERSION;
@@ -224,7 +268,13 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#voice").value = S.get("voice", "Kore");
   $("#voice").onchange = () => S.set("voice", $("#voice").value);
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
-  initModels();
+  initModels(); renderProjects(); navigator.storage?.persist?.();
+  $("#btnNew").onclick = newProject;
+  $("#projects").addEventListener("click", async e => {
+    const d = e.target.dataset;
+    if (d.open) openProject(d.open);
+    if (d.del && confirm("حذف هذا المشروع نهائياً؟")) { await DB.del(d.del); if (cur && cur.id === d.del) cur = null; renderProjects(); }
+  });
   $("#btnSet").onclick = () => $("#dlg").showModal();
   $("#btnSave").onclick = () => {
     S.set("kText", $("#kText").value); S.set("kAudio", $("#kAudio").value);
@@ -233,7 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#btnTest").onclick = testKeys;
   $("#btnModels").onclick = async () => { S.set("kText", $("#kText").value); S.set("kAudio", $("#kAudio").value); try { await loadModels(); } catch (e) { msg(e.message, true); } };
   $("#btnGen").onclick = generate; $("#btnPrev").onclick = preview; $("#btnAud").onclick = genAudio; $("#btnMerge").onclick = merge;
-  $("#shots").addEventListener("input", e => { const t = e.target; if (t.dataset.i) shots[t.dataset.i][t.dataset.k] = t.value; });
+  $("#shots").addEventListener("input", e => { const t = e.target; if (t.dataset.i) { shots[t.dataset.i][t.dataset.k] = t.value; saveSoon(); } });
   $("#shots").addEventListener("click", e => { const i = e.target.dataset.copy; if (i != null) { navigator.clipboard.writeText(shots[i].flow_prompt); msg("تم النسخ."); setTimeout(() => msg(""), 1200); } });
   $("#btnCopyAll").onclick = () => { navigator.clipboard.writeText(shots.map((s, i) => `لقطة ${i + 1}:\n${s.flow_prompt}`).join("\n\n")); msg("تم نسخ الكل."); setTimeout(() => msg(""), 1200); };
   $("#clips").onchange = e => { clips = [...e.target.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })); renderClips(); };
@@ -242,5 +292,5 @@ document.addEventListener("DOMContentLoaded", () => {
     if (d.up != null) sw(+d.up, +d.up - 1); if (d.dn != null) sw(+d.dn, +d.dn + 1); if (d.rm != null) clips.splice(+d.rm, 1);
     renderClips();
   });
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { });
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").then(r => r.update()).catch(() => { });
 });
