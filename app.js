@@ -1,4 +1,4 @@
-const VERSION = "1.2.1";
+const VERSION = "1.2.2";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -11,7 +11,7 @@ const LANGS = {
   mix: "Algerian Darija mixed with common French words, the way Algerians really speak, written in Arabic script (French words may stay in Latin letters)",
   fusha: "simple Modern Standard Arabic"
 };
-let shots = [], audioBlob = null, clips = [], ff = null;
+let shots = [], audioBlob = null, clips = [], ff = null, imgs = [];
 
 function msg(t, err) { const s = $("#status"); s.textContent = t; s.className = err ? "err" : ""; s.hidden = !t; }
 const keys = n => (S.get(n, "") || "").split(/\s+/).filter(Boolean);
@@ -111,7 +111,7 @@ async function generate() {
   if (!f.name) return msg("اكتب اسم المنتج أولاً.", true);
   $("#btnGen").disabled = true; msg("Gemini يكتب السيناريو…");
   try {
-    const files = [...$("#img").files].slice(0, 6), parts = [];
+    const files = imgs.map(x => x.f), parts = [];
     for (let i = 0; i < files.length; i++) {
       parts.push({ text: "Image #" + (i + 1) + ":" });
       parts.push({ inlineData: { mimeType: "image/jpeg", data: await imgB64(files[i]) } });
@@ -138,22 +138,24 @@ function renderShots(d) {
 }
 
 const COLORS = ["#d93a31", "#c77700", "#12805a", "#2563eb", "#7c3aed", "#be185d"];
-function renderGallery(srcs, descs = []) {
-  $("#gallery").innerHTML = srcs.map((s, i) => `<figure><img src="${s}" alt=""><b style="background:${COLORS[i % 6]}">#${i + 1}</b><figcaption>${esc(descs[i] || "")}</figcaption></figure>`).join("");
+function renderGallery(srcs, descs = [], rm = false) {
+  $("#gallery").innerHTML = srcs.map((s, i) => `<figure><img src="${s}" alt=""><b style="background:${COLORS[i % 6]}">#${i + 1}</b><figcaption>${esc(descs[i] || "")}</figcaption>${rm ? `<button class="x" data-rm="${i}">✕</button>` : ""}</figure>`).join("");
 }
 const refsHtml = s => (s.refs && s.refs.length) ? `<div class="refs">ارفع كمرجع في Flow: ${s.refs.map(r => `<span class="tag" style="background:${COLORS[(r - 1) % 6]}">#${r}</span>`).join(" ")}</div>` : "";
 
-const BROKEN = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><rect width='96' height='96' fill='%232a3541'/></svg>";
-async function previewFiles(fl) {
-  const all = [...fl], list = all.slice(0, 6), srcs = [], bad = [];
-  $("#gallery").innerHTML = ""; msg("جاري تحضير " + list.length + " صورة…");
-  for (const f of list) {
-    try { srcs.push("data:image/jpeg;base64," + await imgB64(f, 240, .7)); } catch (e) { srcs.push(BROKEN); bad.push(f.name); }
-    renderGallery(srcs);
+async function addImages(fl) {
+  const got = [...fl]; $("#img").value = "";
+  if (!got.length) return;
+  msg("جاري تحضير الصور…"); let added = 0; const bad = [];
+  for (const f of got) {
+    if (imgs.length >= 6) break;
+    if (imgs.some(x => x.f.name === f.name && x.f.size === f.size && x.f.lastModified === f.lastModified)) continue;
+    try { imgs.push({ f, t: "data:image/jpeg;base64," + await imgB64(f, 240, .7) }); added++; } catch (e) { bad.push(f.name); }
+    renderGallery(imgs.map(x => x.t), [], true);
   }
-  let t = "تم اختيار " + all.length + " صورة" + (all.length > 6 ? " (ستُستعمل أول 6)" : "");
-  if (bad.length) t += " — تعذر قراءة: " + bad.join("، ");
-  msg(t, bad.length > 0); if (!bad.length) setTimeout(() => msg(""), 2500);
+  let t = "تمت إضافة " + added + " من " + got.length + " (المجموع " + imgs.length + "/6). لإضافة المزيد اضغط اختيار الملفات مرة أخرى.";
+  if (bad.length) t += " تعذر قراءة: " + bad.join("، ");
+  msg(t, bad.length > 0); setTimeout(() => msg(""), 6000);
 }
 
 /* ---------- Voice ---------- */
@@ -275,12 +277,12 @@ async function openProject(id) {
   const p = await DB.get(id); if (!p) return;
   cur = p; shots = p.shots; audioBlob = p.audio || null;
   FIELDS.forEach(k => $("#" + k).value = p.form[k]); if (p.voice) $("#voice").value = p.voice;
-  resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }); if (audioBlob) showAudio(); renderProjects();
+  imgs = []; resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }); if (audioBlob) showAudio(); renderProjects();
 }
 function newProject() {
   cur = null; shots = []; audioBlob = null; resetAudioUI();
   FIELDS.forEach(k => { const e = $("#" + k); if (e.tagName !== "SELECT") e.value = ""; });
-  $("#img").value = ""; renderGallery([]); ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = true);
+  $("#img").value = ""; imgs = []; renderGallery([]); ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = true);
   renderProjects(); window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -293,7 +295,8 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
   initModels(); renderProjects(); navigator.storage?.persist?.();
   $("#btnNew").onclick = newProject;
-  $("#img").onchange = e => previewFiles(e.target.files);
+  $("#img").onchange = e => addImages(e.target.files);
+  $("#gallery").addEventListener("click", e => { const r = e.target.dataset.rm; if (r != null && imgs.length) { imgs.splice(+r, 1); renderGallery(imgs.map(x => x.t), [], true); } });
   $("#projects").addEventListener("click", async e => {
     const d = e.target.dataset;
     if (d.open) openProject(d.open);

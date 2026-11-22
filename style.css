@@ -47,3 +47,4 @@ dialog::backdrop{background:#000a}
 .gal figcaption{font-size:.7rem;color:var(--mut);direction:ltr;text-align:left}
 .refs{margin:-4px 0 8px;font-size:.85rem;color:var(--mut)}
 .tag{display:inline-block;margin-inline-start:4px}
+.gal .x{position:absolute;top:4px;left:4px;padding:0 7px;background:#000b;color:#fff;border-radius:5px;font-size:.8rem}
