@@ -28,7 +28,8 @@
   <label>وصف قصير ومميزاته<textarea id="desc" rows="3"></textarea></label>
   <label>الجمهور المستهدف<input id="aud" placeholder="مثال: شباب، ربات البيوت، أصحاب المحلات"></label>
   <label>العرض / الدعوة لاتخاذ إجراء<input id="offer" placeholder="مثال: التوصيل لـ 58 ولاية، السعر 2500 دج، اتصل على 05..."></label>
-  <label>صورة المنتج (اختياري، يحلل Gemini شكله)<input id="img" type="file" accept="image/*"></label>
+  <label>صور المنتج أو المكان (حتى 6، اختياري)<input id="img" type="file" accept="image/*" multiple></label>
+  <div id="gallery" class="gal"></div>
   <div class="grid">
     <label>نوع الإعلان<select id="type"><option value="physical product">منتج</option><option value="service">خدمة</option><option value="restaurant / food">مطعم وأكل</option><option value="mobile app">تطبيق</option><option value="real estate">عقار</option><option value="fashion / clothing">ملابس وموضة</option><option value="beauty / cosmetics">تجميل</option></select></label>
     <label>اللغة<select id="lang"><option value="darija">الدارجة الجزائرية</option><option value="mix">دارجة + فرنسية</option><option value="fusha">الفصحى</option></select></label>

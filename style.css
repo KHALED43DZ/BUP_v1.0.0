@@ -39,3 +39,11 @@ dialog::backdrop{background:#000a}
 .card img,.card .ph{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:6px;background:var(--line);display:grid;place-items:center;color:var(--g)}
 .card b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .row{margin-top:auto}.card button{padding:4px 10px;font-size:.85rem}
+.gal{display:flex;gap:8px;overflow-x:auto;margin-bottom:10px}
+.gal figure{margin:0;position:relative;width:96px;flex:none}
+.gal img{width:96px;height:96px;object-fit:cover;border-radius:6px;display:block}
+.gal b,.tag{color:#fff;border-radius:5px;padding:0 7px;font-size:.8rem;font-weight:600}
+.gal b{position:absolute;top:4px;right:4px}
+.gal figcaption{font-size:.7rem;color:var(--mut);direction:ltr;text-align:left}
+.refs{margin:-4px 0 8px;font-size:.85rem;color:var(--mut)}
+.tag{display:inline-block;margin-inline-start:4px}

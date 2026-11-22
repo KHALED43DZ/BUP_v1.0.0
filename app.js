@@ -1,4 +1,4 @@
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -92,8 +92,8 @@ function buildPrompt(f, hasImg) {
   return `You are a senior ad creative for the Algerian market. Create a ${f.dur}-second video ad.
 Product: ${f.name}. Details: ${f.desc}. Category: ${f.type}. Audience: ${f.aud || "general Algerian public"}. Offer/CTA: ${f.offer || "invite viewers to order now"}.
 Tone: ${f.tone}. Visual style: ${f.style}. ${f.people}.
-${hasImg ? "Study the attached product image and describe the product's exact look (shape, colors, packaging) inside style_bible so every shot keeps it identical." : ""}
-Return ONLY JSON: {"title":string,"style_bible":string,"shots":[{"flow_prompt":string,"voiceover":string}],"caption":string}
+${hasImg ? hasImg + " reference image(s) are attached, numbered #1 to #" + hasImg + " in the order given. Describe each one briefly in the images array (what it shows, e.g. front of the product, shop interior). Describe the exact look of the product/place inside style_bible so every shot keeps it identical. For each shot, refs lists the image numbers (1 to " + hasImg + ") the user should upload to Flow as reference for that shot: the 1 to 3 most relevant only, or an empty array if none fits." : "No reference images were attached, so refs must be an empty array and images an empty array."}
+Return ONLY JSON: {"title":string,"style_bible":string,"images":[string],"shots":[{"flow_prompt":string,"refs":[number],"voiceover":string}],"caption":string}
 Rules:
 - Exactly ${n} shots of 10 seconds each. Structure: strong hook in the first 3 seconds, problem, product as the solution, benefits, then a clear call to action with the offer in the last shot.
 - style_bible: one English paragraph (lighting, color palette, lens, product look) repeated inside every flow_prompt.
@@ -110,28 +110,37 @@ async function generate() {
   if (!f.name) return msg("اكتب اسم المنتج أولاً.", true);
   $("#btnGen").disabled = true; msg("Gemini يكتب السيناريو…");
   try {
-    const parts = []; const file = $("#img").files[0];
-    if (file) parts.push({ inlineData: { mimeType: "image/jpeg", data: await imgB64(file) } });
-    parts.push({ text: buildPrompt(f, !!file) });
+    const files = [...$("#img").files].slice(0, 6), parts = [];
+    for (let i = 0; i < files.length; i++) {
+      parts.push({ text: "Image #" + (i + 1) + ":" });
+      parts.push({ inlineData: { mimeType: "image/jpeg", data: await imgB64(files[i]) } });
+    }
+    parts.push({ text: buildPrompt(f, files.length) });
     const model = $("#mText").value || "gemini-2.5-flash";
     const j = await withKeys("kText", k => gem(`models/${model}:generateContent`, { contents: [{ parts }], generationConfig: { responseMimeType: "application/json", temperature: .9 } }, k));
     const txt = j.candidates[0].content.parts.map(p => p.text || "").join("").replace(/```json|```/g, "").trim();
     const d = JSON.parse(txt);
     shots = d.shots; audioBlob = null; resetAudioUI();
-    cur = { id: Date.now().toString(36), created: Date.now(), name: f.name, caption: d.caption || "", thumb: file ? await imgB64(file, 200, .7) : "", voice: $("#voice").value, form: Object.fromEntries(FIELDS.map(k => [k, $("#" + k).value])) };
-    await saveCur(); renderShots(d); renderProjects(); msg("");
+    cur = { id: Date.now().toString(36), created: Date.now(), name: f.name, caption: d.caption || "", thumbs: await Promise.all(files.map(x => imgB64(x, 240, .7))), images: d.images || [], voice: $("#voice").value, form: Object.fromEntries(FIELDS.map(k => [k, $("#" + k).value])) };
+    await saveCur(); renderGallery(cur.thumbs.map(t => "data:image/jpeg;base64," + t), cur.images); renderShots(d); renderProjects(); msg("");
   } catch (e) { msg("تعذر الإنشاء: " + e.message, true); }
   $("#btnGen").disabled = false;
 }
 function renderShots(d) {
   $("#shots").innerHTML = shots.map((s, i) => `<div class="shot"><b>لقطة ${i + 1}</b>
-    <label>برومبت Flow<textarea class="en" rows="5" data-i="${i}" data-k="flow_prompt">${s.flow_prompt}</textarea></label>
+    <label>برومبت Flow<textarea class="en" rows="5" data-i="${i}" data-k="flow_prompt">${s.flow_prompt}</textarea></label>${refsHtml(s)}
     <label>التعليق الصوتي<textarea rows="3" data-i="${i}" data-k="voiceover">${s.voiceover}</textarea></label>
     <button data-copy="${i}">نسخ البرومبت</button></div>`).join("");
   $("#cap").textContent = d.caption ? "الوصف المقترح: " + d.caption : "";
   ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = false);
   $("#secRes").scrollIntoView({ behavior: "smooth" });
 }
+
+const COLORS = ["#d93a31", "#c77700", "#12805a", "#2563eb", "#7c3aed", "#be185d"];
+function renderGallery(srcs, descs = []) {
+  $("#gallery").innerHTML = srcs.map((s, i) => `<figure><img src="${s}" alt=""><b style="background:${COLORS[i % 6]}">#${i + 1}</b><figcaption>${esc(descs[i] || "")}</figcaption></figure>`).join("");
+}
+const refsHtml = s => (s.refs && s.refs.length) ? `<div class="refs">ارفع كمرجع في Flow: ${s.refs.map(r => `<span class="tag" style="background:${COLORS[(r - 1) % 6]}">#${r}</span>`).join(" ")}</div>` : "";
 
 /* ---------- Voice ---------- */
 function wav(pcm, sr = 24000) {
@@ -243,7 +252,7 @@ function showAudio() {
 async function renderProjects() {
   const list = ((await DB.all()) || []).sort((x, y) => y.updated - x.updated);
   $("#projects").innerHTML = list.length ? list.map(p => `<div class="card${cur && cur.id === p.id ? " on" : ""}">
-    ${p.thumb ? `<img src="data:image/jpeg;base64,${p.thumb}" alt="">` : `<div class="ph">▶</div>`}
+    ${(p.thumbs && p.thumbs[0]) || p.thumb ? `<img src="data:image/jpeg;base64,${(p.thumbs && p.thumbs[0]) || p.thumb}" alt="">` : `<div class="ph">▶</div>`}
     <b>${esc(p.name)}</b><span class="mut">${p.shots.length * 10} ث · ${LN[p.form.lang] || ""} · ${new Date(p.updated).toLocaleDateString("fr-FR")}${p.audio ? " · 🔊" : ""}</span>
     <div class="row"><button data-open="${p.id}">فتح</button><button data-del="${p.id}">حذف</button></div></div>`).join("")
     : `<p class="mut">لا توجد مشاريع بعد. أول إعلان تنشئه سيُحفظ هنا تلقائياً.</p>`;
@@ -252,12 +261,12 @@ async function openProject(id) {
   const p = await DB.get(id); if (!p) return;
   cur = p; shots = p.shots; audioBlob = p.audio || null;
   FIELDS.forEach(k => $("#" + k).value = p.form[k]); if (p.voice) $("#voice").value = p.voice;
-  resetAudioUI(); renderShots({ caption: p.caption }); if (audioBlob) showAudio(); renderProjects();
+  resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }); if (audioBlob) showAudio(); renderProjects();
 }
 function newProject() {
   cur = null; shots = []; audioBlob = null; resetAudioUI();
   FIELDS.forEach(k => { const e = $("#" + k); if (e.tagName !== "SELECT") e.value = ""; });
-  $("#img").value = ""; ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = true);
+  $("#img").value = ""; renderGallery([]); ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = true);
   renderProjects(); window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -270,6 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
   initModels(); renderProjects(); navigator.storage?.persist?.();
   $("#btnNew").onclick = newProject;
+  $("#img").onchange = e => { const fs = [...e.target.files]; if (fs.length > 6) msg("الحد الأقصى 6 صور، ستُستعمل أول 6 فقط.", true); renderGallery(fs.slice(0, 6).map(x => URL.createObjectURL(x))); };
   $("#projects").addEventListener("click", async e => {
     const d = e.target.dataset;
     if (d.open) openProject(d.open);
@@ -285,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#btnGen").onclick = generate; $("#btnPrev").onclick = preview; $("#btnAud").onclick = genAudio; $("#btnMerge").onclick = merge;
   $("#shots").addEventListener("input", e => { const t = e.target; if (t.dataset.i) { shots[t.dataset.i][t.dataset.k] = t.value; saveSoon(); } });
   $("#shots").addEventListener("click", e => { const i = e.target.dataset.copy; if (i != null) { navigator.clipboard.writeText(shots[i].flow_prompt); msg("تم النسخ."); setTimeout(() => msg(""), 1200); } });
-  $("#btnCopyAll").onclick = () => { navigator.clipboard.writeText(shots.map((s, i) => `لقطة ${i + 1}:\n${s.flow_prompt}`).join("\n\n")); msg("تم نسخ الكل."); setTimeout(() => msg(""), 1200); };
+  $("#btnCopyAll").onclick = () => { navigator.clipboard.writeText(shots.map((s, i) => `لقطة ${i + 1}${s.refs && s.refs.length ? " (صور مرجعية: " + s.refs.map(r => "#" + r).join(" ") + ")" : ""}:\n${s.flow_prompt}`).join("\n\n")); msg("تم نسخ الكل."); setTimeout(() => msg(""), 1200); };
   $("#clips").onchange = e => { clips = [...e.target.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })); renderClips(); };
   $("#clipList").addEventListener("click", e => {
     const d = e.target.dataset, sw = (a, b) => { if (b >= 0 && b < clips.length) [clips[a], clips[b]] = [clips[b], clips[a]]; };
