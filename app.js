@@ -1,4 +1,4 @@
-const VERSION = "1.2.2";
+const VERSION = "1.2.3";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -99,7 +99,7 @@ Rules:
 - Exactly ${n} shots of 10 seconds each. Structure: strong hook in the first 3 seconds, problem, product as the solution, benefits, then a clear call to action with the offer in the last shot.
 - style_bible: one English paragraph (lighting, color palette, lens, product look) repeated inside every flow_prompt.
 - flow_prompt: English, for Google Flow/Veo, aspect ratio ${f.ratio}. Describe action, camera movement, setting, lighting. No on-screen text, no speech, no music.
-- voiceover: in ${LANGS[f.lang]}. About 20 to 24 words per shot, natural spoken ad copy, no stage directions.
+- voiceover: in ${LANGS[f.lang]}. Only 15 to 18 words per shot (each shot lasts 10 seconds and Darija is spoken fast, so the voiceover must fit in about 8.5 seconds), natural spoken ad copy, no stage directions.
 - caption: a short social media caption in the same language with hashtags.`;
 }
 function readForm() {
@@ -170,7 +170,7 @@ function wav(pcm, sr = 24000) {
 }
 async function tts(text) {
   const f = readForm(), voice = $("#voice").value;
-  const style = `Read this Algerian advertisement in a ${f.tone} tone with a natural Algerian accent, at a lively advertising pace, with short pauses between sentences: `;
+  const style = `Read this Algerian advertisement in a ${f.tone} tone with a natural Algerian accent, at a brisk, lively advertising pace, with short pauses between sentences: `;
   const model = $("#mTTS").value || "gemini-2.5-flash-preview-tts";
   const j = await withKeys("kAudio", k => gem(`models/${model}:generateContent`, {
     contents: [{ parts: [{ text: style + text }] }],
@@ -196,6 +196,7 @@ async function preview() {
 
 /* ---------- Merge ---------- */
 const errText = e => (e && e.message) || (typeof e === "string" ? e : (() => { try { return JSON.stringify(e); } catch { return String(e); } })()) || "خطأ غير معروف";
+const mediaDur = f => new Promise(ok => { const v = document.createElement("video"), u = URL.createObjectURL(f); v.preload = "metadata"; v.onloadedmetadata = () => { ok(v.duration || 0); URL.revokeObjectURL(u); }; v.onerror = () => ok(0); v.src = u; });
 const loadScript = src => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("تعذر تحميل " + src)); document.head.appendChild(s); });
 async function loadFF() {
   if (ff) return ff;
@@ -229,15 +230,22 @@ async function merge() {
       list += `file 'c${i}.mp4'\n`;
     }
     await f.writeFile("l.txt", list);
+    const vd = (await Promise.all(clips.map(mediaDur))).reduce((s, x) => s + x, 0), ad = await mediaDur(audioBlob);
+    let af = "apad", note = "";
+    if (vd > 1 && ad > vd - 0.2) {
+      const r = Math.min(1.25, ad / (vd - 0.3));
+      af = "atempo=" + r.toFixed(3) + ",apad"; note = " (تسريع الصوت ×" + r.toFixed(2) + ")";
+      if (ad / r > vd) note += " الصوت ما زال أطول وسيُقص، اختصر النص.";
+    }
     const base = ["-f", "concat", "-safe", "0", "-i", "l.txt", "-i", "a.wav", "-map", "0:v:0", "-map", "1:a:0"];
-    const tail = ["-af", "apad", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", "out.mp4"];
+    const tail = ["-af", af, "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", "out.mp4"];
     let code = await f.exec([...base, "-c:v", "copy", ...tail]);
     if (code !== 0) code = await f.exec([...base, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", ...tail]);
     if (code !== 0) throw new Error("فشل الدمج، تأكد أن المقاطع بصيغة mp4.");
     const data = await f.readFile("out.mp4"), url = URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
     $("#out").src = url; $("#out").hidden = false; $("#out-dl").href = url; $("#out-dl").hidden = false;
     for (let i = 0; i < clips.length; i++) await f.deleteFile(`c${i}.mp4`).catch(() => { });
-    msg("تم الدمج.");
+    msg("تم الدمج." + note);
   } catch (e) { msg("خطأ في الدمج: " + errText(e), true); }
   $("#btnMerge").disabled = false;
 }
@@ -263,7 +271,7 @@ function resetAudioUI() { $("#aud-el").hidden = true; $("#aud-dl").hidden = true
 function showAudio() {
   const url = URL.createObjectURL(audioBlob), a = $("#aud-el");
   a.src = url; a.hidden = false; $("#aud-dl").href = url; $("#aud-dl").hidden = false;
-  a.onloadedmetadata = () => $("#aud-info").textContent = `مدة الصوت ${a.duration.toFixed(1)} ث، ومدة الفيديو المتوقعة ${shots.length * 10} ث.` + (a.duration > shots.length * 10 ? " الصوت أطول من الفيديو وسيُقص، اختصر النص." : "");
+  a.onloadedmetadata = () => $("#aud-info").textContent = `مدة الصوت ${a.duration.toFixed(1)} ث، ومدة الفيديو المتوقعة ${shots.length * 10} ث.` + (a.duration > shots.length * 10 ? " الصوت أطول من الفيديو: سيُسرَّع قليلاً عند الدمج، والأفضل اختصار النص." : "");
 }
 async function renderProjects() {
   const list = ((await DB.all()) || []).sort((x, y) => y.updated - x.updated);
