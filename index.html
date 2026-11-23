@@ -73,9 +73,14 @@
   <h2>4. الدمج</h2>
   <label>مقاطع Flow (mp4)<input id="clips" type="file" accept="video/*" multiple></label>
   <ol id="clipList"></ol>
+  <label>إنشاء نسخة معاينة بشريط مائل<select id="mkPrev"><option value="yes">نعم</option><option value="no">لا</option></select></label>
   <div class="row"><button id="btnMerge" class="main">ادمج الفيديو مع الصوت</button></div>
+  <h3 id="out-lbl" hidden>النسخة الأصلية (بعد الدفع)</h3>
   <video id="out" controls playsinline hidden></video>
-  <a id="out-dl" class="btn" hidden download="ad.mp4">تحميل الإعلان</a>
+  <div class="row"><a id="out-dl" class="btn" hidden download="ad.mp4">تحميل الأصلية</a><button id="out-sh" hidden>مشاركة</button></div>
+  <h3 id="prev-lbl" hidden>نسخة المعاينة (للزبون)</h3>
+  <video id="prev" controls playsinline hidden></video>
+  <div class="row"><a id="prev-dl" class="btn" hidden download="preview.mp4">تحميل المعاينة</a><button id="prev-sh" hidden>مشاركة</button></div>
 </section>
 </main>
 
@@ -87,6 +92,9 @@
   <div id="testOut" class="mut"></div>
   <label>نموذج النص<select id="mText"></select></label>
   <label>نموذج الصوت<select id="mTTS"></select></label>
+  <label>نص شريط المعاينة<input id="wmText" placeholder="نموذج للمعاينة"></label>
+  <label>سطر العلامة أسفل المعاينة (اسمك أو رقم واتساب)<input id="wmBrand"></label>
+  <div class="grid"><label>شفافية الشريط<select id="wmOp"><option value="0.6">خفيفة</option><option value="0.75">متوسطة</option><option value="0.9">قوية</option></select></label><label>شريطان متقاطعان<select id="wm2"><option value="no">لا</option><option value="yes">نعم</option></select></label></div>
   <p class="mut">المفاتيح تُحفظ في متصفحك فقط. عند تجاوز الحصة ينتقل التطبيق للمفتاح التالي تلقائياً.</p>
   <div class="row"><button id="btnSave" class="main">حفظ وإغلاق</button></div>
 </dialog>

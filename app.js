@@ -1,4 +1,4 @@
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -234,7 +234,7 @@ async function loadFF() {
   await loadScript(cdn + "@ffmpeg/util@0.12.1/dist/umd/index.js");
   const { toBlobURL } = FFmpegUtil, core = cdn + "@ffmpeg/core@0.12.6/dist/esm/";
   const f = new FFmpegWASM.FFmpeg();
-  f.on("progress", ({ progress }) => msg("جاري الدمج… " + Math.round(Math.min(1, Math.max(0, progress)) * 100) + "%"));
+  f.on("progress", ({ progress }) => msg("جاري " + (window.__ph || "الدمج") + "… " + Math.round(Math.min(1, Math.max(0, progress)) * 100) + "%"));
   await f.load({
     classWorkerURL: await toBlobURL(cdn + "@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js", "text/javascript"),
     coreURL: await toBlobURL(core + "ffmpeg-core.js", "text/javascript"),
@@ -245,10 +245,57 @@ async function loadFF() {
 function renderClips() {
   $("#clipList").innerHTML = clips.map((c, i) => `<li>${c.name} <button data-up="${i}">▲</button><button data-dn="${i}">▼</button><button data-rm="${i}">✕</button></li>`).join("");
 }
+const vidSize = b => new Promise(ok => { const v = document.createElement("video"), u = URL.createObjectURL(b); v.preload = "metadata"; v.onloadedmetadata = () => { ok({ w: v.videoWidth, h: v.videoHeight }); URL.revokeObjectURL(u); }; v.onerror = () => ok({ w: 0, h: 0 }); v.src = u; });
+function setOut(id, blob, name) {
+  const u = URL.createObjectURL(blob), d = $("#" + id + "-dl");
+  $("#" + id).src = u; d.href = u; d.download = name;
+  ["", "-dl", "-sh", "-lbl"].forEach(s => $("#" + id + s).hidden = false);
+  $("#" + id + "-sh").onclick = () => shareBlob(blob, name);
+}
+async function shareBlob(b, name) {
+  const file = new File([b], name, { type: "video/mp4" });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: name });
+    else msg("المشاركة المباشرة غير مدعومة في متصفحك، استعمل زر التحميل.", true);
+  } catch (e) { if (e.name !== "AbortError") msg("تعذرت المشاركة: " + errText(e), true); }
+}
+async function wmPng(W, H) {
+  const text = S.get("wmText", "نموذج للمعاينة") || "نموذج للمعاينة", brand = S.get("wmBrand", ""), op = +S.get("wmOp", "0.75") || .75, two = S.get("wm2", "no") === "yes";
+  try { await document.fonts.load("bold 30px Cairo"); } catch (e) { }
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d"), font = px => `bold ${px}px Cairo, Tahoma, "Segoe UI", sans-serif`;
+  const band = ang => {
+    const bh = Math.round(H * .085), len = Math.hypot(W, H) * 1.3;
+    x.save(); x.translate(W / 2, H / 2); x.rotate(ang * Math.PI / 180);
+    x.fillStyle = `rgba(0,0,0,${op})`; x.fillRect(-len / 2, -bh / 2, len, bh);
+    x.beginPath(); x.rect(-len / 2, -bh / 2, len, bh); x.clip();
+    x.fillStyle = "#fff"; x.font = font(bh * .52); x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl";
+    const unit = text + "   ◆   "; let line = unit; while (x.measureText(line).width < len) line += unit;
+    x.fillText(line, 0, 0); x.restore();
+  };
+  band(-25); if (two) band(25);
+  if (brand) {
+    const bh = Math.round(H * .05); x.fillStyle = "rgba(0,0,0,.7)"; x.fillRect(0, H - bh, W, bh);
+    x.fillStyle = "#fff"; x.font = font(bh * .55); x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(brand, W / 2, H - bh / 2);
+  }
+  const b = await new Promise(ok => c.toBlob(ok, "image/png"));
+  return new Uint8Array(await b.arrayBuffer());
+}
+async function makePreview(f, blob) {
+  const { w, h } = await vidSize(blob);
+  if (!w) throw new Error("تعذر قراءة أبعاد الفيديو");
+  const s = Math.min(1, (w > h ? 640 : 480) / w), W = Math.round(w * s / 2) * 2, H = Math.round(h * s / 2) * 2;
+  await f.writeFile("wm.png", await wmPng(W, H));
+  const r = await f.exec(["-y", "-i", "out.mp4", "-i", "wm.png", "-filter_complex", "[0:v]scale=" + W + ":" + H + "[b];[b][1:v]overlay=0:0", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", "prev.mp4"]);
+  if (r !== 0) throw new Error("فشل ترميز المعاينة");
+  const d = await f.readFile("prev.mp4");
+  await f.deleteFile("prev.mp4").catch(() => { }); await f.deleteFile("wm.png").catch(() => { });
+  return new Blob([d], { type: "video/mp4" });
+}
 async function merge() {
   if (!audioBlob) return msg("ولّد الصوت أولاً.", true);
   if (!clips.length) return msg("ارفع مقاطع Flow أولاً.", true);
-  $("#btnMerge").disabled = true;
+  $("#btnMerge").disabled = true; ["prev", "prev-dl", "prev-sh", "prev-lbl"].forEach(i => $("#" + i).hidden = true);
   try {
     const f = await loadFF(); msg("جاري الدمج…");
     await f.writeFile("a.wav", new Uint8Array(await audioBlob.arrayBuffer()));
@@ -265,15 +312,22 @@ async function merge() {
       af = "atempo=" + r.toFixed(3) + ",apad"; note = " (تسريع الصوت ×" + r.toFixed(2) + ")";
       if (ad / r > vd) note += " الصوت ما زال أطول وسيُقص، اختصر النص.";
     }
-    const base = ["-f", "concat", "-safe", "0", "-i", "l.txt", "-i", "a.wav", "-map", "0:v:0", "-map", "1:a:0"];
+    const base = ["-y", "-f", "concat", "-safe", "0", "-i", "l.txt", "-i", "a.wav", "-map", "0:v:0", "-map", "1:a:0"];
     const tail = ["-af", af, "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", "out.mp4"];
     let code = await f.exec([...base, "-c:v", "copy", ...tail]);
     if (code !== 0) code = await f.exec([...base, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", ...tail]);
     if (code !== 0) throw new Error("فشل الدمج، تأكد أن المقاطع بصيغة mp4.");
-    const data = await f.readFile("out.mp4"), url = URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
-    $("#out").src = url; $("#out").hidden = false; $("#out-dl").href = url; $("#out-dl").hidden = false;
+    const data = await f.readFile("out.mp4"), outBlob = new Blob([data], { type: "video/mp4" });
+    const fn = (cur && cur.name ? cur.name : "ad").replace(/[^\w\u0600-\u06FF]+/g, "_");
+    setOut("out", outBlob, fn + "_original.mp4");
     for (let i = 0; i < clips.length; i++) await f.deleteFile(`c${i}.mp4`).catch(() => { });
     msg("تم الدمج." + note);
+    if ($("#mkPrev").value === "yes") {
+      try { window.__ph = "إنشاء المعاينة"; setOut("prev", await makePreview(f, outBlob), fn + "_preview.mp4"); msg("تم إنشاء النسختين." + note); }
+      catch (e) { msg("تم الدمج، لكن تعذر إنشاء المعاينة: " + errText(e), true); }
+      window.__ph = "الدمج";
+    }
+    ["out.mp4", "a.wav", "l.txt"].forEach(n => f.deleteFile(n).catch(() => { }));
   } catch (e) { msg("خطأ في الدمج: " + errText(e), true); }
   $("#btnMerge").disabled = false;
 }
@@ -329,6 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#voice").value = S.get("voice", "Kore");
   $("#voice").onchange = () => S.set("voice", $("#voice").value);
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
+  $("#wmText").value = S.get("wmText", "نموذج للمعاينة"); $("#wmBrand").value = S.get("wmBrand", ""); $("#wmOp").value = S.get("wmOp", "0.75"); $("#wm2").value = S.get("wm2", "no");
   initModels(); renderProjects(); navigator.storage?.persist?.();
   $("#btnNew").onclick = newProject; $("#type").onchange = toggleUsed; $("#btnDef").onclick = detectDefects; toggleUsed();
   $("#img").onchange = e => addImages(e.target.files);
@@ -341,7 +396,8 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#btnSet").onclick = () => $("#dlg").showModal();
   $("#btnSave").onclick = () => {
     S.set("kText", $("#kText").value); S.set("kAudio", $("#kAudio").value);
-    S.set("mText", $("#mText").value); S.set("mTTS", $("#mTTS").value); $("#dlg").close();
+    S.set("mText", $("#mText").value); S.set("mTTS", $("#mTTS").value);
+    ["wmText", "wmBrand", "wmOp", "wm2"].forEach(k => S.set(k, $("#" + k).value)); $("#dlg").close();
   };
   $("#btnTest").onclick = testKeys;
   $("#btnModels").onclick = async () => { S.set("kText", $("#kText").value); S.set("kAudio", $("#kAudio").value); try { await loadModels(); } catch (e) { msg(e.message, true); } };
