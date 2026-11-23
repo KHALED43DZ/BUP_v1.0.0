@@ -31,7 +31,7 @@
   <label>صور المنتج أو المكان (حتى 6، اختياري). إن لم تُضَف إلا صورة واحدة، اضغط الزر مرة أخرى لإضافة غيرها<input id="img" type="file" accept="image/*" multiple></label>
   <div id="gallery" class="gal"></div>
   <div class="grid">
-    <label>نوع الإعلان<select id="type"><option value="physical product">منتج</option><option value="service">خدمة</option><option value="restaurant / food">مطعم وأكل</option><option value="mobile app">تطبيق</option><option value="real estate">عقار</option><option value="fashion / clothing">ملابس وموضة</option><option value="beauty / cosmetics">تجميل</option></select></label>
+    <label>نوع الإعلان<select id="type"><option value="physical product">منتج</option><option value="used">منتج مستعمل</option><option value="service">خدمة</option><option value="restaurant / food">مطعم وأكل</option><option value="mobile app">تطبيق</option><option value="real estate">عقار</option><option value="fashion / clothing">ملابس وموضة</option><option value="beauty / cosmetics">تجميل</option></select></label>
     <label>اللغة<select id="lang"><option value="darija">الدارجة الجزائرية</option><option value="mix">دارجة + فرنسية</option><option value="fusha">الفصحى</option></select></label>
     <label>النبرة<select id="tone"><option value="energetic">حماسي</option><option value="luxury">فاخر</option><option value="funny">فكاهي</option><option value="emotional">عاطفي</option><option value="urgent limited offer">عاجل</option></select></label>
     <label>الأسلوب البصري<select id="style"><option value="cinematic commercial">سينمائي</option><option value="UGC handheld authentic">UGC عفوي</option><option value="minimal clean studio">بسيط ونظيف</option><option value="vibrant colorful">ألوان زاهية</option></select></label>
@@ -39,6 +39,16 @@
     <label>الصيغة<select id="ratio"><option>9:16</option><option>16:9</option><option>1:1</option></select></label>
     <label>المدة<select id="dur"><option value="10">10 ثوانٍ</option><option value="20" selected>20 ثانية</option><option value="30">30 ثانية</option><option value="40">40 ثانية</option></select></label>
     <label>الصوت<select id="voice"></select></label>
+  </div>
+  <div id="usedBox" hidden>
+    <label>الحالة العامة<select id="ucond"><option value="excellent">ممتازة</option><option value="good" selected>جيدة</option><option value="fair">متوسطة</option><option value="has clear defects">بها عيوب واضحة</option></select></label>
+    <label>مدة الاستعمال<input id="uuse" placeholder="مثال: سنتان، استعمال خفيف"></label>
+    <label>العيوب المعروفة (سطر لكل عيب)<textarea id="udef" rows="4"></textarea></label>
+    <div class="row"><button id="btnDef" type="button">اكتشف العيوب من الصور</button></div>
+    <label>ما يعمل وما لا يعمل<textarea id="uwork" rows="2"></textarea></label>
+    <label>سبب البيع<input id="ureason"></label>
+    <label>السعر وهل هو قابل للتفاوض<input id="uprice" placeholder="مثال: 12000 دج قابل للتفاوض"></label>
+    <label>ملاحظة في الوصف: الصور حقيقية والفيديو بمساعدة الذكاء الاصطناعي<select id="udisc"><option value="yes">نعم</option><option value="no">لا</option></select></label>
   </div>
   <div class="row"><button id="btnGen" class="main">أنشئ السيناريو والبرومبتات</button><button id="btnPrev">تجربة الصوت</button></div>
 </section>

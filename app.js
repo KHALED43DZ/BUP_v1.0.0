@@ -1,4 +1,4 @@
-const VERSION = "1.2.3";
+const VERSION = "1.3.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -89,12 +89,13 @@ async function imgB64(file, max = 1024, q = .85) {
   return c.toDataURL("image/jpeg", q).split(",")[1];
 }
 function buildPrompt(f, hasImg) {
-  const n = f.dur / 10;
+  const n = f.dur / 10, used = f.type === "used";
   return `You are a senior ad creative for the Algerian market. Create a ${f.dur}-second video ad.
-Product: ${f.name}. Details: ${f.desc}. Category: ${f.type}. Audience: ${f.aud || "general Algerian public"}. Offer/CTA: ${f.offer || "invite viewers to order now"}.
+Product: ${f.name}. Details: ${f.desc}. Category: ${used ? "USED / second-hand item" : f.type}. Audience: ${f.aud || "general Algerian public"}. Offer/CTA: ${f.offer || "invite viewers to order now"}.
 Tone: ${f.tone}. Visual style: ${f.style}. ${f.people}.
 ${hasImg ? hasImg + " reference image(s) are attached, numbered #1 to #" + hasImg + " in the order given. Describe each one briefly in the images array (what it shows, e.g. front of the product, shop interior). Describe the exact look of the product/place inside style_bible so every shot keeps it identical. For each shot, refs lists the image numbers (1 to " + hasImg + ") the user should upload to Flow as reference for that shot: the 1 to 3 most relevant only, or an empty array if none fits." : "No reference images were attached, so refs must be an empty array and images an empty array."}
-Return ONLY JSON: {"title":string,"style_bible":string,"images":[string],"shots":[{"flow_prompt":string,"refs":[number],"voiceover":string}],"caption":string}
+${used ? usedRules(f) : ""}
+Return ONLY JSON: {"title":string,"style_bible":string,"images":[string],"shots":[{"flow_prompt":string,"refs":[number],"shoot_yourself":boolean,"voiceover":string}],"caption":string}
 Rules:
 - Exactly ${n} shots of 10 seconds each. Structure: strong hook in the first 3 seconds, problem, product as the solution, benefits, then a clear call to action with the offer in the last shot.
 - style_bible: one English paragraph (lighting, color palette, lens, product look) repeated inside every flow_prompt.
@@ -104,7 +105,7 @@ Rules:
 }
 function readForm() {
   const g = id => $("#" + id).value.trim();
-  return { name: g("name"), desc: g("desc"), aud: g("aud"), offer: g("offer"), type: g("type"), lang: g("lang"), tone: g("tone"), style: g("style"), people: g("people"), ratio: g("ratio"), dur: +g("dur") };
+  return { name: g("name"), desc: g("desc"), aud: g("aud"), offer: g("offer"), type: g("type"), lang: g("lang"), tone: g("tone"), style: g("style"), people: g("people"), ratio: g("ratio"), dur: +g("dur"), ucond: g("ucond"), uuse: g("uuse"), udef: g("udef"), uwork: g("uwork"), ureason: g("ureason"), uprice: g("uprice"), udisc: g("udisc") };
 }
 async function generate() {
   const f = readForm();
@@ -129,7 +130,7 @@ async function generate() {
 }
 function renderShots(d) {
   $("#shots").innerHTML = shots.map((s, i) => `<div class="shot"><b>لقطة ${i + 1}</b>
-    <label>برومبت Flow<textarea class="en" rows="5" data-i="${i}" data-k="flow_prompt">${s.flow_prompt}</textarea></label>${refsHtml(s)}
+    <label>برومبت Flow<textarea class="en" rows="5" data-i="${i}" data-k="flow_prompt">${s.flow_prompt}</textarea></label>${refsHtml(s)}${s.shoot_yourself ? `<div class="shoot">🎥 يُنصح بتصويرها بنفسك بهاتفك لأنها تُظهر العيوب أو التجربة الفعلية</div>` : ""}
     <label>التعليق الصوتي<textarea rows="3" data-i="${i}" data-k="voiceover">${s.voiceover}</textarea></label>
     <button data-copy="${i}">نسخ البرومبت</button></div>`).join("");
   $("#cap").textContent = d.caption ? "الوصف المقترح: " + d.caption : "";
@@ -156,6 +157,33 @@ async function addImages(fl) {
   let t = "تمت إضافة " + added + " من " + got.length + " (المجموع " + imgs.length + "/6). لإضافة المزيد اضغط اختيار الملفات مرة أخرى.";
   if (bad.length) t += " تعذر قراءة: " + bad.join("، ");
   msg(t, bad.length > 0); setTimeout(() => msg(""), 6000);
+}
+
+const usedRules = f => `
+THIS IS A USED, SECOND-HAND ITEM AND THE AD MUST BE COMPLETELY HONEST:
+- Condition: ${f.ucond || "not specified"}. Time used: ${f.uuse || "not specified"}. Reason for selling: ${f.ureason || "not specified"}. Price: ${f.uprice || "not specified"}.
+- Known defects (must be shown and mentioned, never hidden): ${f.udef || "none declared"}.
+- What works / what does not: ${f.uwork || "not specified"}.
+- Every flow_prompt must state that the item looks exactly like the reference image(s), keeps every scratch, stain, wear mark and dent, and must NOT be cleaned, polished, repaired, restyled, upgraded or made to look new. Use plain natural lighting with no glamour or beauty enhancement.
+- One shot must be an honest close-up on the defects. Set "shoot_yourself" to true for shots that show defects or demonstrate the item working, because the seller should film them with their own phone (still write a flow_prompt as a fallback); false for the others.
+- Voiceover: sincere and trustworthy, no exaggeration, never say "like new" unless the condition is excellent. Say the real defects out loud in a friendly honest way (in Darija for example "نقولك الحقيقة"), mention what works, the reason for selling and the price, and invite the buyer to inspect and test before buying.
+- The caption ${f.udisc === "yes" ? "must end with a short note that the photos are real and the video was made with AI assistance" : "must stay honest about the condition"}.
+`;
+const toggleUsed = () => { $("#usedBox").hidden = $("#type").value !== "used"; };
+async function detectDefects() {
+  if (!imgs.length) return msg("أضف صور المنتج أولاً.", true);
+  $("#btnDef").disabled = true; msg("Gemini يفحص الصور…");
+  try {
+    const parts = [];
+    for (let i = 0; i < imgs.length; i++) { parts.push({ text: "Image #" + (i + 1) + ":" }); parts.push({ inlineData: { mimeType: "image/jpeg", data: await imgB64(imgs[i].f) } }); }
+    parts.push({ text: "These are photos of a USED item being sold. In Arabic, list only the defects, wear, scratches, stains, dents or damage that are CLEARLY visible, one per line, each ending with the image number like (#1). Be accurate and neutral: never invent a defect and never hide one. If nothing is clearly visible write: لا توجد عيوب واضحة في الصور. Output plain lines only." });
+    const model = $("#mText").value || "gemini-2.5-flash";
+    const j = await withKeys("kText", k => gem(`models/${model}:generateContent`, { contents: [{ parts }] }, k));
+    const t = j.candidates[0].content.parts.map(p => p.text || "").join("").trim(), el = $("#udef");
+    el.value = (el.value.trim() ? el.value.trim() + "\n" : "") + t;
+    msg("راجع قائمة العيوب وعدّلها: قد يفوّت الذكاء الاصطناعي عيباً أو يخطئ.");
+  } catch (e) { msg("تعذر الفحص: " + errText(e), true); }
+  $("#btnDef").disabled = false;
 }
 
 /* ---------- Voice ---------- */
@@ -252,7 +280,7 @@ async function merge() {
 
 /* ---------- Projects ---------- */
 let cur = null, saveT;
-const FIELDS = ["name", "desc", "aud", "offer", "type", "lang", "tone", "style", "people", "ratio", "dur"];
+const FIELDS = ["name", "desc", "aud", "offer", "type", "lang", "tone", "style", "people", "ratio", "dur", "ucond", "uuse", "udef", "uwork", "ureason", "uprice", "udisc"];
 const LN = { darija: "دارجة", mix: "دارجة + فرنسية", fusha: "فصحى" };
 const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
 const DB = {
@@ -284,7 +312,7 @@ async function renderProjects() {
 async function openProject(id) {
   const p = await DB.get(id); if (!p) return;
   cur = p; shots = p.shots; audioBlob = p.audio || null;
-  FIELDS.forEach(k => $("#" + k).value = p.form[k]); if (p.voice) $("#voice").value = p.voice;
+  FIELDS.forEach(k => { if (p.form[k] !== undefined) $("#" + k).value = p.form[k]; }); toggleUsed(); if (p.voice) $("#voice").value = p.voice;
   imgs = []; resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }); if (audioBlob) showAudio(); renderProjects();
 }
 function newProject() {
@@ -302,7 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#voice").onchange = () => S.set("voice", $("#voice").value);
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
   initModels(); renderProjects(); navigator.storage?.persist?.();
-  $("#btnNew").onclick = newProject;
+  $("#btnNew").onclick = newProject; $("#type").onchange = toggleUsed; $("#btnDef").onclick = detectDefects; toggleUsed();
   $("#img").onchange = e => addImages(e.target.files);
   $("#gallery").addEventListener("click", e => { const r = e.target.dataset.rm; if (r != null && imgs.length) { imgs.splice(+r, 1); renderGallery(imgs.map(x => x.t), [], true); } });
   $("#projects").addEventListener("click", async e => {
@@ -320,7 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#btnGen").onclick = generate; $("#btnPrev").onclick = preview; $("#btnAud").onclick = genAudio; $("#btnMerge").onclick = merge;
   $("#shots").addEventListener("input", e => { const t = e.target; if (t.dataset.i) { shots[t.dataset.i][t.dataset.k] = t.value; saveSoon(); } });
   $("#shots").addEventListener("click", e => { const i = e.target.dataset.copy; if (i != null) { navigator.clipboard.writeText(shots[i].flow_prompt); msg("تم النسخ."); setTimeout(() => msg(""), 1200); } });
-  $("#btnCopyAll").onclick = () => { navigator.clipboard.writeText(shots.map((s, i) => `لقطة ${i + 1}${s.refs && s.refs.length ? " (صور مرجعية: " + s.refs.map(r => "#" + r).join(" ") + ")" : ""}:\n${s.flow_prompt}`).join("\n\n")); msg("تم نسخ الكل."); setTimeout(() => msg(""), 1200); };
+  $("#btnCopyAll").onclick = () => { navigator.clipboard.writeText(shots.map((s, i) => `لقطة ${i + 1}${s.shoot_yourself ? " [صوّرها بنفسك]" : ""}${s.refs && s.refs.length ? " (صور مرجعية: " + s.refs.map(r => "#" + r).join(" ") + ")" : ""}:\n${s.flow_prompt}`).join("\n\n")); msg("تم نسخ الكل."); setTimeout(() => msg(""), 1200); };
   $("#clips").onchange = e => { clips = [...e.target.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })); renderClips(); };
   $("#clipList").addEventListener("click", e => {
     const d = e.target.dataset, sw = (a, b) => { if (b >= 0 && b < clips.length) [clips[a], clips[b]] = [clips[b], clips[a]]; };
