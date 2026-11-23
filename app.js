@@ -1,4 +1,4 @@
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {

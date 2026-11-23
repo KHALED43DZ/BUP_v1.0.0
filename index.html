@@ -13,11 +13,12 @@
 <body>
 <header>
   <button id="btnSet" class="icon" aria-label="الإعدادات">⚙</button>
+  <button id="btnBiz" class="icon" aria-label="صفحتي التجارية">💼</button>
   <h1>BUP <small>إعلانات بالدارجة الجزائرية</small></h1>
   <span class="ver" id="ver"></span>
 </header>
 <div id="status" role="status" hidden></div>
-<main>
+<main id="viewMain">
 <section>
   <div class="row between"><h2>مشاريعي</h2><button id="btnNew">+ مشروع جديد</button></div>
   <div id="projects" class="cards"></div>
@@ -83,6 +84,48 @@
   <div class="row"><a id="prev-dl" class="btn" hidden download="preview.mp4">تحميل المعاينة</a><button id="prev-sh" hidden>مشاركة</button></div>
 </section>
 </main>
+<main id="viewBiz" hidden>
+<section>
+  <div class="row between"><h2>صفحتي التجارية</h2><button id="btnBack">← رجوع</button></div>
+  <p class="mut">أدخل بياناتك مرة واحدة، فتُحفظ على هذا الجهاز وتظهر في بطاقة الأسعار.</p>
+</section>
+<section>
+  <h2>الملف التجاري</h2>
+  <label>اسم العلامة<input id="bName"></label>
+  <label>شعار نصي<input id="bSlogan" placeholder="مثال: إعلانك جاهز في 24 ساعة"></label>
+  <label>رقم واتساب<input id="bPhone" inputmode="tel" dir="ltr"></label>
+  <label>حساب إنستغرام أو تيك توك<input id="bSocial" dir="ltr"></label>
+  <label>مجال الخدمة أو التغطية<input id="bArea"></label>
+  <label>عنوان البطاقة<input id="bTitle"></label>
+  <label>الشعار (صورة، اختياري)<input id="bLogoIn" type="file" accept="image/*"></label>
+  <div class="grid">
+    <label>القالب<select id="bTheme"><option value="green">أخضر داكن</option><option value="night">أزرق ليلي</option><option value="light">فاتح</option></select></label>
+    <label>اللون الرئيسي<input id="bColor" type="color"></label>
+  </div>
+</section>
+<section>
+  <h2>الباقات والأسعار</h2>
+  <div id="pkgList"></div>
+  <div class="row"><button id="btnPkg">+ باقة</button></div>
+  <p class="mut">السعر العادي يجب أن يكون سعرك الحقيقي، فالتخفيض الوهمي يُفقد الزبون ثقته.</p>
+</section>
+<section>
+  <h2>العروض</h2>
+  <div class="grid">
+    <label>المناسبة<select id="bOcc"><option value="none">بدون</option><option value="ramadan">رمضان</option><option value="eid">العيد</option><option value="school">الدخول المدرسي</option><option value="bf">الجمعة السوداء</option><option value="ny">رأس السنة</option></select></label>
+    <label>نسبة التخفيض %<input id="bDisc" type="number" inputmode="numeric" min="0" max="90"></label>
+  </div>
+  <label>هدية أو ميزة (اختياري)<input id="bGift" placeholder="مثال: تعديل مجاني، أو الإعلان الثاني هدية"></label>
+  <label>ينتهي العرض في<input id="bEnd" type="date"></label>
+  <p id="offerNote" class="mut"></p>
+</section>
+<section>
+  <h2>بطاقة الأسعار</h2>
+  <label>المقاس<select id="bFmt"><option value="story">ستوري 9:16</option><option value="post">منشور 1:1</option></select></label>
+  <canvas id="card"></canvas>
+  <div class="row"><button id="btnCardDl" class="main">تحميل PNG</button><button id="btnCardSh">مشاركة</button></div>
+</section>
+</main>
 
 <dialog id="dlg">
   <h2>الإعدادات</h2>
@@ -99,5 +142,6 @@
   <div class="row"><button id="btnSave" class="main">حفظ وإغلاق</button></div>
 </dialog>
 <script src="app.js"></script>
+<script src="biz.js"></script>
 </body>
 </html>
