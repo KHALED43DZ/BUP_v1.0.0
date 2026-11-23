@@ -134,8 +134,73 @@ document.addEventListener("DOMContentLoaded", () => {
     try { if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file] }); else msg("المشاركة المباشرة غير مدعومة، استعمل التحميل.", true); }
     catch (e) { if (e.name !== "AbortError") msg("تعذرت المشاركة: " + errText(e), true); }
   };
-  const show = b => { $("#viewBiz").hidden = !b; $("#viewMain").hidden = b; window.scrollTo(0, 0); if (b) draw(); };
+  const show = b => { $("#viewBiz").hidden = !b; $("#viewMain").hidden = b; window.scrollTo(0, 0); if (b) { draw(); renderTpl(); renderPort(); } };
   $("#btnBiz").onclick = () => show($("#viewBiz").hidden);
   $("#btnBack").onclick = () => show(false);
-  renderPkgs(); noteOffer(); loadLogo(biz.logo);
+
+  /* ---------- Stage 2 ---------- */
+  const tplData = () => {
+    const f = biz.f, nm = ($("#tName").value || "").trim() || "صاحب المتجر", brand = f.bName || "[اسم علامتك]", o = offer();
+    const phone = f.bPhone ? "\nللتواصل: " + f.bPhone : "";
+    const pk = biz.pkgs.filter(p => p.name || p.price).map(p => {
+      const sp = sale(p, o.d), pr = +p.price || 0;
+      return "• " + (p.name || "باقة") + (pr ? ": " + (sp ? "~" + num(pr) + "~ " + num(sp) : num(pr)) + " دج" : "") + (p.inc ? " — " + p.inc : "");
+    }).join("\n");
+    return [
+      ["الرسالة الأولى", `السلام عليكم ${nm}،\nمعاك ${brand}. نصنع إعلانات فيديو قصيرة بالدارجة الجزائرية للمتاجر والمشاريع، تنشرها على تيك توك وإنستغرام وفيسبوك.${f.bSlogan ? "\n" + f.bSlogan : ""}\nتحب نوريك أمثلة من أعمالنا؟${phone}`],
+      ["إرسال الباقات والأسعار", `أهلا ${nm}، هذي باقاتنا:\n${pk || "• [أضف باقاتك في صفحتي]"}${o.text ? "\n\n" + o.text : ""}\n\nإذا حبيت نبدأ قولي وأنا نوضحلك الخطوات.${phone}`],
+      ["طلب معلومات المنتج", `تمام ${nm}، باش نبدأ نحتاج:\n1) صور واضحة للمنتج من عدة زوايا\n2) اسم المنتج ومميزاته\n3) السعر والعرض إن وجد\n4) رقم التواصل أو رابط الطلب\n5) الفئة اللي تحب تستهدفها\nنبعثلك بعدها نسخة معاينة تشوفها قبل ما تقرر.`],
+      ["إرسال المعاينة", `هذي نسخة المعاينة للإعلان (عليها علامة "نموذج للمعاينة"). إذا عجبتك نسلمك النسخة الأصلية بدون العلامة بعد تأكيد الدفع. واش رأيك؟${phone}`],
+      ["متابعة وتذكير", o.text ? `السلام عليكم ${nm}، تذكير بسيط: ${o.text}.\nنقدر نبدأ معاك في أي وقت.${phone}` : `السلام عليكم ${nm}، نتابع معاك بخصوص الإعلان. واش تحب نوضحلك حاجة أو نعدل في العرض؟${phone}`]
+    ];
+  };
+  const renderTpl = () => {
+    $("#tplList").innerHTML = tplData().map((t, i) => `<div class="shot"><b>${t[0]}</b><textarea rows="6">${esc(t[1])}</textarea>
+      <div class="row"><button data-tcopy="${i}">نسخ</button><button data-twa="${i}">إرسال عبر واتساب</button></div></div>`).join("");
+  };
+  $("#tName").addEventListener("input", renderTpl);
+  $("#tplList").addEventListener("click", e => {
+    const d = e.target.dataset, box = e.target.closest(".shot"); if (!box || (d.tcopy == null && d.twa == null)) return;
+    const text = box.querySelector("textarea").value;
+    if (d.twa != null) window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
+    else { navigator.clipboard.writeText(text); msg("تم النسخ."); setTimeout(() => msg(""), 1200); }
+  });
+
+  $("#btnSelfAd").onclick = () => {
+    const f = biz.f, o = offer(), set = (id, v) => { $("#" + id).value = v; };
+    const lines = biz.pkgs.filter(p => p.name || p.price).map(p => {
+      const sp = sale(p, o.d), pr = +p.price || 0;
+      return (p.name || "باقة") + (p.inc ? " (" + p.inc + ")" : "") + (pr ? ": " + (sp ? num(sp) + " دج بدل " + num(pr) : num(pr) + " دج") : "");
+    });
+    newProject();
+    set("name", f.bName || "خدمة إعلانات الفيديو");
+    set("desc", ["خدمة صناعة إعلانات فيديو قصيرة بالدارجة الجزائرية للمتاجر والمشاريع الصغيرة، تُنشر على تيك توك وإنستغرام وفيسبوك.", f.bSlogan, lines.length ? "الباقات: " + lines.join(" | ") : "", f.bArea].filter(Boolean).join(" "));
+    set("aud", "أصحاب المتاجر والمشاريع الصغيرة في الجزائر");
+    set("offer", [o.text, f.bPhone ? "واتساب " + f.bPhone : ""].filter(Boolean).join(" — "));
+    set("type", "service"); set("lang", "darija"); set("tone", "energetic"); set("people", "with people"); set("ratio", "9:16"); set("dur", "20");
+    toggleUsed(); show(false); msg("تم تجهيز نموذج إعلان خدمتك. راجعه ثم اضغط «أنشئ السيناريو والبرومبتات».");
+  };
+
+  const W = { all: () => DB.tx("readonly", s => s.getAll(), "w"), put: v => DB.tx("readwrite", s => s.put(v), "w"), del: id => DB.tx("readwrite", s => s.delete(id), "w") };
+  let portCache = {};
+  async function renderPort() {
+    const list = ((await W.all()) || []).sort((x, y) => y.created - x.created);
+    portCache = Object.fromEntries(list.map(w => [w.id, w]));
+    $("#portList").innerHTML = list.length ? list.map(w => `<div class="card"><video src="${URL.createObjectURL(w.blob)}#t=0.1" controls playsinline preload="metadata"></video><b>${esc(w.title)}</b><span class="mut">${new Date(w.created).toLocaleDateString("fr-FR")}</span>
+      <div class="row"><button data-wsh="${w.id}">مشاركة</button><button data-wdl="${w.id}">تحميل</button><button data-wdel="${w.id}">حذف</button></div></div>`).join("")
+      : `<p class="mut">لا توجد أعمال بعد. بعد دمج إعلان اضغط «حفظ في معرض الأعمال».</p>`;
+  }
+  $("#portList").addEventListener("click", async e => {
+    const d = e.target.dataset, w = portCache[d.wsh || d.wdl || d.wdel]; if (!w) return;
+    if (d.wsh) shareBlob(w.blob, w.name);
+    if (d.wdl) { const a = document.createElement("a"); a.href = URL.createObjectURL(w.blob); a.download = w.name; a.click(); }
+    if (d.wdel && confirm("حذف هذا العمل من المعرض؟")) { await W.del(w.id); renderPort(); }
+  });
+  $("#btnPort").onclick = async () => {
+    const it = (window.__last || {}).prev || (window.__last || {}).out; if (!it) return;
+    const title = prompt("عنوان العمل في المعرض:", it.name.replace(/_(preview|original)\.mp4$/, "")); if (title === null) return;
+    try { await W.put({ id: Date.now().toString(36), title: title || "عمل", created: Date.now(), blob: it.blob, name: it.name }); msg("تم الحفظ في معرض الأعمال."); setTimeout(() => msg(""), 2000); renderPort(); }
+    catch (err) { msg("تعذر الحفظ: " + errText(err), true); }
+  };
+  renderPkgs(); noteOffer(); loadLogo(biz.logo); renderTpl(); renderPort();
 });

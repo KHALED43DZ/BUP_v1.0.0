@@ -1,4 +1,4 @@
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -251,6 +251,7 @@ function setOut(id, blob, name) {
   $("#" + id).src = u; d.href = u; d.download = name;
   ["", "-dl", "-sh", "-lbl"].forEach(s => $("#" + id + s).hidden = false);
   $("#" + id + "-sh").onclick = () => shareBlob(blob, name);
+  (window.__last = window.__last || {})[id] = { blob, name }; $("#btnPort").hidden = false;
 }
 async function shareBlob(b, name) {
   const file = new File([b], name, { type: "video/mp4" });
@@ -295,7 +296,7 @@ async function makePreview(f, blob) {
 async function merge() {
   if (!audioBlob) return msg("ولّد الصوت أولاً.", true);
   if (!clips.length) return msg("ارفع مقاطع Flow أولاً.", true);
-  $("#btnMerge").disabled = true; ["prev", "prev-dl", "prev-sh", "prev-lbl"].forEach(i => $("#" + i).hidden = true);
+  $("#btnMerge").disabled = true; ["prev", "prev-dl", "prev-sh", "prev-lbl"].forEach(i => $("#" + i).hidden = true); window.__last = {}; $("#btnPort").hidden = true;
   try {
     const f = await loadFF(); msg("جاري الدمج…");
     await f.writeFile("a.wav", new Uint8Array(await audioBlob.arrayBuffer()));
@@ -338,8 +339,8 @@ const FIELDS = ["name", "desc", "aud", "offer", "type", "lang", "tone", "style",
 const LN = { darija: "دارجة", mix: "دارجة + فرنسية", fusha: "فصحى" };
 const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
 const DB = {
-  open() { return this.p || (this.p = new Promise((ok, no) => { const r = indexedDB.open("bup", 1); r.onupgradeneeded = () => r.result.createObjectStore("p", { keyPath: "id" }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); })); },
-  async tx(m, f) { const d = await this.open(); return new Promise((ok, no) => { const t = d.transaction("p", m), q = f(t.objectStore("p")); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); }); },
+  open() { return this.p || (this.p = new Promise((ok, no) => { const r = indexedDB.open("bup", 2); r.onupgradeneeded = () => { const d = r.result; ["p", "w"].forEach(n => { if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: "id" }); }); }; r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); })); },
+  async tx(m, f, st = "p") { const d = await this.open(); return new Promise((ok, no) => { const t = d.transaction(st, m), q = f(t.objectStore(st)); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); }); },
   all() { return this.tx("readonly", s => s.getAll()); }, get(id) { return this.tx("readonly", s => s.get(id)); },
   put(p) { return this.tx("readwrite", s => s.put(p)); }, del(id) { return this.tx("readwrite", s => s.delete(id)); }
 };

@@ -54,3 +54,4 @@ h3{font-size:1rem;margin:14px 0 4px}
 input[type=color]{height:42px;padding:2px}
 #card{display:block;width:100%;height:auto;margin:10px 0;border-radius:8px;border:1px solid var(--line)}
 header .icon{padding:2px 8px}
+.card video{width:100%;border-radius:6px;background:#000}

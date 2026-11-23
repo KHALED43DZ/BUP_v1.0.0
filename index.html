@@ -82,6 +82,7 @@
   <h3 id="prev-lbl" hidden>نسخة المعاينة (للزبون)</h3>
   <video id="prev" controls playsinline hidden></video>
   <div class="row"><a id="prev-dl" class="btn" hidden download="preview.mp4">تحميل المعاينة</a><button id="prev-sh" hidden>مشاركة</button></div>
+  <div class="row"><button id="btnPort" hidden>حفظ في معرض الأعمال</button></div>
 </section>
 </main>
 <main id="viewBiz" hidden>
@@ -124,6 +125,21 @@
   <label>المقاس<select id="bFmt"><option value="story">ستوري 9:16</option><option value="post">منشور 1:1</option></select></label>
   <canvas id="card"></canvas>
   <div class="row"><button id="btnCardDl" class="main">تحميل PNG</button><button id="btnCardSh">مشاركة</button></div>
+</section>
+<section>
+  <h2>فيديو ترويجي لخدمتي</h2>
+  <p class="mut">يجهّز نموذج صانع الإعلانات تلقائياً ببياناتك وباقاتك وعرضك، لتنشئ إعلاناً عن خدمتك بنفس المسار.</p>
+  <div class="row"><button id="btnSelfAd" class="main">جهّز إعلان خدمتي</button></div>
+</section>
+<section>
+  <h2>رسائل التواصل بالدارجة</h2>
+  <label>اسم الزبون أو المتجر (اختياري)<input id="tName"></label>
+  <p class="mut">تُملأ القوالب ببياناتك وأسعارك. عدّل النص كما تشاء قبل النسخ أو الإرسال (تعديلاتك تضيع إن غيّرت اسم الزبون).</p>
+  <div id="tplList"></div>
+</section>
+<section>
+  <h2>معرض أعمالي</h2>
+  <div id="portList" class="cards"></div>
 </section>
 </main>
 
