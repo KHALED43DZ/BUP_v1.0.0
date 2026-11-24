@@ -178,13 +178,13 @@ document.addEventListener("DOMContentLoaded", () => {
     set("aud", "أصحاب المتاجر والمشاريع الصغيرة في الجزائر");
     set("offer", [o.text, f.bPhone ? "واتساب " + f.bPhone : ""].filter(Boolean).join(" — "));
     set("type", "service"); set("lang", "darija"); set("tone", "energetic"); set("people", "with people"); set("ratio", "9:16"); set("dur", "20");
-    toggleUsed(); show(false); msg("تم تجهيز نموذج إعلان خدمتك. راجعه ثم اضغط «أنشئ السيناريو والبرومبتات».");
+    toggleUsed(); saveDraft(); show(false); msg("تم تجهيز نموذج إعلان خدمتك. راجعه ثم اضغط «أنشئ السيناريو والبرومبتات».");
   };
 
   const W = { all: () => DB.tx("readonly", s => s.getAll(), "w"), put: v => DB.tx("readwrite", s => s.put(v), "w"), del: id => DB.tx("readwrite", s => s.delete(id), "w") };
   let portCache = {};
   async function renderPort() {
-    const list = ((await W.all()) || []).sort((x, y) => y.created - x.created);
+    let list; try { list = ((await W.all()) || []).sort((x, y) => y.created - x.created); } catch (e) { $("#portList").innerHTML = `<p class="mut">تعذر قراءة المعرض: ${esc(errText(e))}</p>`; return; }
     portCache = Object.fromEntries(list.map(w => [w.id, w]));
     $("#portList").innerHTML = list.length ? list.map(w => `<div class="card"><video src="${URL.createObjectURL(w.blob)}#t=0.1" controls playsinline preload="metadata"></video><b>${esc(w.title)}</b><span class="mut">${new Date(w.created).toLocaleDateString("fr-FR")}</span>
       <div class="row"><button data-wsh="${w.id}">مشاركة</button><button data-wdl="${w.id}">تحميل</button><button data-wdel="${w.id}">حذف</button></div></div>`).join("")

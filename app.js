@@ -1,4 +1,4 @@
-const VERSION = "1.7.0";
+const VERSION = "1.7.1";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -124,11 +124,11 @@ async function generate() {
     const d = JSON.parse(txt);
     shots = d.shots; audioBlob = null; dlgMode = f.mode === "dialogue"; resetAudioUI();
     cur = { id: Date.now().toString(36), created: Date.now(), name: f.name, caption: d.caption || "", thumbs: await Promise.all(files.map(x => imgB64(x, 240, .7))), images: d.images || [], voice: $("#voice").value, form: Object.fromEntries(FIELDS.map(k => [k, $("#" + k).value])) };
-    await saveCur(); renderGallery(cur.thumbs.map(t => "data:image/jpeg;base64," + t), cur.images); renderShots(d); renderProjects(); msg("");
+    const saved = await saveCur(); S.set("curId", cur.id); renderGallery(cur.thumbs.map(t => "data:image/jpeg;base64," + t), cur.images); renderShots(d); renderProjects(); msg(saved ? "" : "تم إنشاء السيناريو لكن تعذر حفظه في المشاريع: " + (window.__saveErr || ""), !saved);
   } catch (e) { msg("تعذر الإنشاء: " + e.message, true); }
   $("#btnGen").disabled = false;
 }
-function renderShots(d) {
+function renderShots(d, quiet) {
   $("#shots").innerHTML = shots.map((s, i) => `<div class="shot"><b>لقطة ${i + 1}</b>
     <label>برومبت Flow${dlgMode ? " (يتضمن الحوار في آخره، عدّله هنا)" : ""}<textarea class="en" rows="${dlgMode ? 9 : 5}" data-i="${i}" data-k="flow_prompt">${s.flow_prompt}</textarea></label>${refsHtml(s)}${s.shoot_yourself ? `<div class="shoot">🎥 يُنصح بتصويرها بنفسك بهاتفك لأنها تُظهر العيوب أو التجربة الفعلية</div>` : ""}
     ${dlgMode ? "" : `<label>التعليق الصوتي<textarea rows="3" data-i="${i}" data-k="voiceover">${s.voiceover}</textarea></label>`}
@@ -136,7 +136,7 @@ function renderShots(d) {
   $("#cap").textContent = d.caption ? "الوصف المقترح: " + d.caption : "";
   ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = false);
   $("#secAud").hidden = dlgMode; $("#keepAudio").value = dlgMode ? "keep" : "replace";
-  $("#secRes").scrollIntoView({ behavior: "smooth" });
+  if (!quiet) $("#secRes").scrollIntoView({ behavior: "smooth" });
 }
 
 const COLORS = ["#d93a31", "#c77700", "#12805a", "#2563eb", "#7c3aed", "#be185d"];
@@ -362,16 +362,21 @@ const FIELDS = ["name", "desc", "aud", "offer", "type", "lang", "tone", "style",
 const LN = { darija: "دارجة", mix: "دارجة + فرنسية", fusha: "فصحى" };
 const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
 const DB = {
-  open() { return this.p || (this.p = new Promise((ok, no) => { const r = indexedDB.open("bup", 2); r.onupgradeneeded = () => { const d = r.result; ["p", "w"].forEach(n => { if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: "id" }); }); }; r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); })); },
+  open() { return this.p || (this.p = new Promise((ok, no) => { const r = indexedDB.open("bup", 2), to = setTimeout(() => { this.p = null; no(new Error("التخزين مشغول: أغلق نوافذ وتبويبات التطبيق الأخرى ثم أعد التحميل")); }, 5000); r.onupgradeneeded = () => { const d = r.result; ["p", "w"].forEach(n => { if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: "id" }); }); }; r.onblocked = () => msg("أغلق نوافذ وتبويبات التطبيق الأخرى ليكتمل التحديث، ثم أعد التحميل.", true);
+    r.onsuccess = () => { clearTimeout(to); r.result.onversionchange = () => { r.result.close(); this.p = null; }; ok(r.result); };
+    r.onerror = () => { clearTimeout(to); this.p = null; no(r.error); }; })); },
   async tx(m, f, st = "p") { const d = await this.open(); return new Promise((ok, no) => { const t = d.transaction(st, m), q = f(t.objectStore(st)); t.oncomplete = () => ok(q && q.result); t.onerror = () => no(t.error); }); },
   all() { return this.tx("readonly", s => s.getAll()); }, get(id) { return this.tx("readonly", s => s.get(id)); },
   put(p) { return this.tx("readwrite", s => s.put(p)); }, del(id) { return this.tx("readwrite", s => s.delete(id)); }
 };
 async function saveCur() {
-  if (!cur) return;
+  if (!cur) return true;
   cur.shots = shots; cur.audio = audioBlob; cur.updated = Date.now();
-  try { await DB.put(cur); } catch (e) { msg("تعذر حفظ المشروع: " + errText(e), true); }
+  try { await DB.put(cur); return true; } catch (e) { window.__saveErr = errText(e); msg("تعذر حفظ المشروع: " + window.__saveErr, true); return false; }
 }
+const DRAFT_IDS = [...FIELDS, "voice", "keepAudio", "mkPrev"];
+const saveDraft = () => S.set("draft", Object.fromEntries(DRAFT_IDS.map(k => [k, $("#" + k).value])));
+function restoreDraft() { const d = S.get("draft", null); if (!d) return; DRAFT_IDS.forEach(k => { const e = $("#" + k); if (e && d[k] !== undefined) e.value = d[k]; }); }
 const saveSoon = () => { clearTimeout(saveT); saveT = setTimeout(saveCur, 700); };
 function resetAudioUI() { $("#aud-el").hidden = true; $("#aud-dl").hidden = true; $("#aud-info").textContent = ""; }
 function showAudio() {
@@ -380,22 +385,23 @@ function showAudio() {
   a.onloadedmetadata = () => $("#aud-info").textContent = `مدة الصوت ${a.duration.toFixed(1)} ث، ومدة الفيديو المتوقعة ${shots.length * 10} ث.` + (a.duration > shots.length * 10 ? " الصوت أطول من الفيديو: سيُسرَّع قليلاً عند الدمج، والأفضل اختصار النص." : "");
 }
 async function renderProjects() {
-  const list = ((await DB.all()) || []).sort((x, y) => y.updated - x.updated);
+  let list; try { list = ((await DB.all()) || []).sort((x, y) => y.updated - x.updated); } catch (e) { $("#projects").innerHTML = `<p class="mut">تعذر قراءة المشاريع: ${esc(errText(e))}</p>`; return; }
   $("#projects").innerHTML = list.length ? list.map(p => `<div class="card${cur && cur.id === p.id ? " on" : ""}">
     ${(p.thumbs && p.thumbs[0]) || p.thumb ? `<img src="data:image/jpeg;base64,${(p.thumbs && p.thumbs[0]) || p.thumb}" alt="">` : `<div class="ph">▶</div>`}
     <b>${esc(p.name)}</b><span class="mut">${p.shots.length * 10} ث · ${LN[p.form.lang] || ""} · ${new Date(p.updated).toLocaleDateString("fr-FR")}${p.audio ? " · 🔊" : ""}</span>
     <div class="row"><button data-open="${p.id}">فتح</button><button data-del="${p.id}">حذف</button></div></div>`).join("")
     : `<p class="mut">لا توجد مشاريع بعد. أول إعلان تنشئه سيُحفظ هنا تلقائياً.</p>`;
 }
-async function openProject(id) {
+async function openProject(id, quiet = false) {
   const p = await DB.get(id); if (!p) return;
   cur = p; shots = p.shots; audioBlob = p.audio || null; dlgMode = p.form.mode === "dialogue";
-  FIELDS.forEach(k => { if (p.form[k] !== undefined) $("#" + k).value = p.form[k]; }); toggleUsed(); if (p.voice) $("#voice").value = p.voice;
-  imgs = []; resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }); if (audioBlob) showAudio(); renderProjects();
+  if (!quiet) { FIELDS.forEach(k => { if (p.form[k] !== undefined) $("#" + k).value = p.form[k]; }); if (p.voice) $("#voice").value = p.voice; toggleUsed(); saveDraft(); S.set("curId", id); }
+  imgs = []; resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }, quiet); if (audioBlob) showAudio(); renderProjects();
 }
 function newProject() {
   cur = null; shots = []; audioBlob = null; resetAudioUI();
-  FIELDS.forEach(k => { const e = $("#" + k); if (e.tagName !== "SELECT") e.value = ""; });
+  FIELDS.forEach(k => { const e = $("#" + k); if (e.tagName === "SELECT") { const i = [...e.options].findIndex(o => o.defaultSelected); e.selectedIndex = i >= 0 ? i : 0; } else e.value = ""; });
+  S.set("curId", ""); S.set("draft", null); toggleUsed();
   $("#img").value = ""; imgs = []; renderGallery([]); ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = true);
   renderProjects(); window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -409,13 +415,15 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
   $("#wmText").value = S.get("wmText", "نموذج للمعاينة"); $("#wmBrand").value = S.get("wmBrand", ""); $("#wmOp").value = S.get("wmOp", "0.75"); $("#wm2").value = S.get("wm2", "no");
   initModels(); renderProjects(); navigator.storage?.persist?.();
-  $("#btnNew").onclick = newProject; $("#type").onchange = toggleUsed; $("#mode").onchange = toggleUsed; $("#btnDef").onclick = detectDefects; toggleUsed();
+  $("#btnNew").onclick = newProject; $("#type").onchange = toggleUsed; $("#mode").onchange = toggleUsed; $("#btnDef").onclick = detectDefects; restoreDraft(); toggleUsed();
+  $("#viewMain").addEventListener("input", saveDraft); $("#viewMain").addEventListener("change", saveDraft);
+  { const cid = S.get("curId", ""); if (cid) openProject(cid, true).catch(() => { }); }
   $("#img").onchange = e => addImages(e.target.files);
   $("#gallery").addEventListener("click", e => { const r = e.target.dataset.rm; if (r != null && imgs.length) { imgs.splice(+r, 1); renderGallery(imgs.map(x => x.t), [], true); } });
   $("#projects").addEventListener("click", async e => {
     const d = e.target.dataset;
     if (d.open) openProject(d.open);
-    if (d.del && confirm("حذف هذا المشروع نهائياً؟")) { await DB.del(d.del); if (cur && cur.id === d.del) cur = null; renderProjects(); }
+    if (d.del && confirm("حذف هذا المشروع نهائياً؟")) { await DB.del(d.del); if (cur && cur.id === d.del) { cur = null; S.set("curId", ""); } renderProjects(); }
   });
   $("#btnSet").onclick = () => $("#dlg").showModal();
   $("#btnSave").onclick = () => {
