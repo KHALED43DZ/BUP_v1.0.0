@@ -1,4 +1,4 @@
-const VERSION = "1.6.0";
+const VERSION = "1.7.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -11,7 +11,7 @@ const LANGS = {
   mix: "Algerian Darija mixed with common French words, the way Algerians really speak, written in Arabic script (French words may stay in Latin letters)",
   fusha: "simple Modern Standard Arabic"
 };
-let shots = [], audioBlob = null, clips = [], ff = null, imgs = [];
+let shots = [], audioBlob = null, clips = [], ff = null, imgs = [], dlgMode = false;
 
 function msg(t, err) { const s = $("#status"); s.textContent = t; s.className = err ? "err" : ""; s.hidden = !t; }
 const keys = n => (S.get(n, "") || "").split(/\s+/).filter(Boolean);
@@ -89,23 +89,23 @@ async function imgB64(file, max = 1024, q = .85) {
   return c.toDataURL("image/jpeg", q).split(",")[1];
 }
 function buildPrompt(f, hasImg) {
-  const n = f.dur / 10, used = f.type === "used";
+  const n = f.dur / 10, used = f.type === "used", dlg = f.mode === "dialogue";
   return `You are a senior ad creative for the Algerian market. Create a ${f.dur}-second video ad.
 Product: ${f.name}. Details: ${f.desc}. Category: ${used ? "USED / second-hand item" : f.type}. Audience: ${f.aud || "general Algerian public"}. Offer/CTA: ${f.offer || "invite viewers to order now"}.
 Tone: ${f.tone}. Visual style: ${f.style}. ${f.people}.
 ${hasImg ? hasImg + " reference image(s) are attached, numbered #1 to #" + hasImg + " in the order given. Describe each one briefly in the images array (what it shows, e.g. front of the product, shop interior). Describe the exact look of the product/place inside style_bible so every shot keeps it identical. For each shot, refs lists the image numbers (1 to " + hasImg + ") the user should upload to Flow as reference for that shot: the 1 to 3 most relevant only, or an empty array if none fits." : "No reference images were attached, so refs must be an empty array and images an empty array."}
-${used ? usedRules(f) : ""}
+${used ? usedRules(f) : ""}${f.prob ? probRules(f) : ""}${dlg ? dialogRules(f) : ""}
 Return ONLY JSON: {"title":string,"style_bible":string,"images":[string],"shots":[{"flow_prompt":string,"refs":[number],"shoot_yourself":boolean,"voiceover":string}],"caption":string}
 Rules:
 - Exactly ${n} shots of 10 seconds each. Structure: strong hook in the first 3 seconds, problem, product as the solution, benefits, then a clear call to action with the offer in the last shot.
 - style_bible: one English paragraph (lighting, color palette, lens, product look) repeated inside every flow_prompt.
-- flow_prompt: English, for Google Flow/Veo, aspect ratio ${f.ratio}. Describe action, camera movement, setting, lighting. No on-screen text, no speech, no music.
-- voiceover: in ${LANGS[f.lang]}. Only 15 to 18 words per shot (each shot lasts 10 seconds and Darija is spoken fast, so the voiceover must fit in about 8.5 seconds), natural spoken ad copy, no stage directions.
+- flow_prompt: English, for Google Flow/Veo, aspect ratio ${f.ratio}. Describe action, camera movement, setting, lighting. ${dlg ? "No on-screen text and no music (speech is allowed only inside the dialogue block)." : "No on-screen text, no speech, no music."}
+${dlg ? "- voiceover: always an empty string (the speech is written inside flow_prompt)." : `- voiceover: in ${LANGS[f.lang]}. Only 15 to 18 words per shot (each shot lasts 10 seconds and Darija is spoken fast, so the voiceover must fit in about 8.5 seconds), natural spoken ad copy, no stage directions.`}
 - caption: a short social media caption in the same language with hashtags.`;
 }
 function readForm() {
   const g = id => $("#" + id).value.trim();
-  return { name: g("name"), desc: g("desc"), aud: g("aud"), offer: g("offer"), type: g("type"), lang: g("lang"), tone: g("tone"), style: g("style"), people: g("people"), ratio: g("ratio"), dur: +g("dur"), ucond: g("ucond"), uuse: g("uuse"), udef: g("udef"), uwork: g("uwork"), ureason: g("ureason"), uprice: g("uprice"), udisc: g("udisc") };
+  return { name: g("name"), desc: g("desc"), aud: g("aud"), offer: g("offer"), type: g("type"), lang: g("lang"), tone: g("tone"), style: g("style"), people: g("people"), ratio: g("ratio"), dur: +g("dur"), ucond: g("ucond"), uuse: g("uuse"), udef: g("udef"), uwork: g("uwork"), ureason: g("ureason"), uprice: g("uprice"), udisc: g("udisc"), mode: g("mode"), drel: g("drel"), dnameA: g("dnameA"), dnameB: g("dnameB"), prob: g("prob") };
 }
 async function generate() {
   const f = readForm();
@@ -122,7 +122,7 @@ async function generate() {
     const j = await withKeys("kText", k => gem(`models/${model}:generateContent`, { contents: [{ parts }], generationConfig: { responseMimeType: "application/json", temperature: .9 } }, k));
     const txt = j.candidates[0].content.parts.map(p => p.text || "").join("").replace(/```json|```/g, "").trim();
     const d = JSON.parse(txt);
-    shots = d.shots; audioBlob = null; resetAudioUI();
+    shots = d.shots; audioBlob = null; dlgMode = f.mode === "dialogue"; resetAudioUI();
     cur = { id: Date.now().toString(36), created: Date.now(), name: f.name, caption: d.caption || "", thumbs: await Promise.all(files.map(x => imgB64(x, 240, .7))), images: d.images || [], voice: $("#voice").value, form: Object.fromEntries(FIELDS.map(k => [k, $("#" + k).value])) };
     await saveCur(); renderGallery(cur.thumbs.map(t => "data:image/jpeg;base64," + t), cur.images); renderShots(d); renderProjects(); msg("");
   } catch (e) { msg("تعذر الإنشاء: " + e.message, true); }
@@ -130,11 +130,12 @@ async function generate() {
 }
 function renderShots(d) {
   $("#shots").innerHTML = shots.map((s, i) => `<div class="shot"><b>لقطة ${i + 1}</b>
-    <label>برومبت Flow<textarea class="en" rows="5" data-i="${i}" data-k="flow_prompt">${s.flow_prompt}</textarea></label>${refsHtml(s)}${s.shoot_yourself ? `<div class="shoot">🎥 يُنصح بتصويرها بنفسك بهاتفك لأنها تُظهر العيوب أو التجربة الفعلية</div>` : ""}
-    <label>التعليق الصوتي<textarea rows="3" data-i="${i}" data-k="voiceover">${s.voiceover}</textarea></label>
+    <label>برومبت Flow${dlgMode ? " (يتضمن الحوار في آخره، عدّله هنا)" : ""}<textarea class="en" rows="${dlgMode ? 9 : 5}" data-i="${i}" data-k="flow_prompt">${s.flow_prompt}</textarea></label>${refsHtml(s)}${s.shoot_yourself ? `<div class="shoot">🎥 يُنصح بتصويرها بنفسك بهاتفك لأنها تُظهر العيوب أو التجربة الفعلية</div>` : ""}
+    ${dlgMode ? "" : `<label>التعليق الصوتي<textarea rows="3" data-i="${i}" data-k="voiceover">${s.voiceover}</textarea></label>`}
     <button data-copy="${i}">نسخ البرومبت</button></div>`).join("");
   $("#cap").textContent = d.caption ? "الوصف المقترح: " + d.caption : "";
   ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = false);
+  $("#secAud").hidden = dlgMode; $("#keepAudio").value = dlgMode ? "keep" : "replace";
   $("#secRes").scrollIntoView({ behavior: "smooth" });
 }
 
@@ -169,7 +170,21 @@ THIS IS A USED, SECOND-HAND ITEM AND THE AD MUST BE COMPLETELY HONEST:
 - Voiceover: sincere and trustworthy, no exaggeration, never say "like new" unless the condition is excellent. Say the real defects out loud in a friendly honest way (in Darija for example "نقولك الحقيقة"), mention what works, the reason for selling and the price, and invite the buyer to inspect and test before buying.
 - The caption ${f.udisc === "yes" ? "must end with a short note that the photos are real and the video was made with AI assistance" : "must stay honest about the condition"}.
 `;
-const toggleUsed = () => { $("#usedBox").hidden = $("#type").value !== "used"; };
+const probRules = f => `
+PROBLEMS THE AUDIENCE FACES (one per line, optionally written as "problem → how the product solves it"):
+${f.prob}
+- The ad must raise these problems in the first seconds, then present the product as the solution. Never promise anything the product details do not support, and avoid medical, miraculous or exaggerated claims.
+`;
+const dialogRules = f => `
+DIALOGUE MODE: the ad is a short conversation between two people (${f.drel}). Person A has the problem or asks the questions; person B answers and recommends the product. ${f.dnameA ? "Person A is called " + f.dnameA + ". " : ""}${f.dnameB ? "Person B is called " + f.dnameB + ". " : ""}If no names are given, use common Algerian first names.
+The speech is generated by Veo inside Google Flow together with the video, so EACH flow_prompt must END with a dialogue block in exactly this format, with the spoken words in ${LANGS[f.lang]} written in Arabic script inside the quotes, 12 to 16 words in total per shot and at most 3 short turns:
+Dialogue (spoken in ${f.lang === "fusha" ? "Modern Standard Arabic" : "Algerian Darija Arabic"}, speak exactly these words, natural voices, no subtitles, no music):
+NAME_A (short voice description, e.g. young man, warm voice): "..."
+NAME_B (short voice description): "..."
+- Describe both people's looks (age, hair, clothing) identically inside style_bible and keep them identical in every shot. Show them in medium shots with their faces visible while they speak.
+- Flow of the ad: in shot 1 person A states the problem within the first 3 seconds and B reacts; then B introduces the product as the solution with its real benefits, the price and the offer; the last shot ends with a clear call to action.
+`;
+const toggleUsed = () => { $("#usedBox").hidden = $("#type").value !== "used"; $("#dlgBox").hidden = $("#mode").value !== "dialogue"; };
 async function detectDefects() {
   if (!imgs.length) return msg("أضف صور المنتج أولاً.", true);
   $("#btnDef").disabled = true; msg("Gemini يفحص الصور…");
@@ -294,29 +309,37 @@ async function makePreview(f, blob) {
   return new Blob([d], { type: "video/mp4" });
 }
 async function merge() {
-  if (!audioBlob) return msg("ولّد الصوت أولاً.", true);
+  const keep = $("#keepAudio").value === "keep";
+  if (!keep && !audioBlob) return msg("ولّد الصوت أولاً.", true);
   if (!clips.length) return msg("ارفع مقاطع Flow أولاً.", true);
   $("#btnMerge").disabled = true; ["prev", "prev-dl", "prev-sh", "prev-lbl"].forEach(i => $("#" + i).hidden = true); window.__last = {}; $("#btnPort").hidden = true;
   try {
     const f = await loadFF(); msg("جاري الدمج…");
-    await f.writeFile("a.wav", new Uint8Array(await audioBlob.arrayBuffer()));
+    if (!keep) await f.writeFile("a.wav", new Uint8Array(await audioBlob.arrayBuffer()));
     let list = "";
     for (let i = 0; i < clips.length; i++) {
       await f.writeFile(`c${i}.mp4`, new Uint8Array(await clips[i].arrayBuffer()));
       list += `file 'c${i}.mp4'\n`;
     }
     await f.writeFile("l.txt", list);
-    const vd = (await Promise.all(clips.map(mediaDur))).reduce((s, x) => s + x, 0), ad = await mediaDur(audioBlob);
+    const vd = (await Promise.all(clips.map(mediaDur))).reduce((s, x) => s + x, 0), ad = keep ? 0 : await mediaDur(audioBlob);
     let af = "apad", note = "";
-    if (vd > 1 && ad > vd - 0.2) {
+    if (!keep && vd > 1 && ad > vd - 0.2) {
       const r = Math.min(1.25, ad / (vd - 0.3));
       af = "atempo=" + r.toFixed(3) + ",apad"; note = " (تسريع الصوت ×" + r.toFixed(2) + ")";
       if (ad / r > vd) note += " الصوت ما زال أطول وسيُقص، اختصر النص.";
     }
-    const base = ["-y", "-f", "concat", "-safe", "0", "-i", "l.txt", "-i", "a.wav", "-map", "0:v:0", "-map", "1:a:0"];
-    const tail = ["-af", af, "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", "out.mp4"];
-    let code = await f.exec([...base, "-c:v", "copy", ...tail]);
-    if (code !== 0) code = await f.exec([...base, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", ...tail]);
+    let code;
+    if (keep) {
+      const b2 = ["-y", "-f", "concat", "-safe", "0", "-i", "l.txt"];
+      code = await f.exec([...b2, "-c", "copy", "-movflags", "+faststart", "out.mp4"]);
+      if (code !== 0) code = await f.exec([...b2, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "out.mp4"]);
+    } else {
+      const base = ["-y", "-f", "concat", "-safe", "0", "-i", "l.txt", "-i", "a.wav", "-map", "0:v:0", "-map", "1:a:0"];
+      const tail = ["-af", af, "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", "out.mp4"];
+      code = await f.exec([...base, "-c:v", "copy", ...tail]);
+      if (code !== 0) code = await f.exec([...base, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", ...tail]);
+    }
     if (code !== 0) throw new Error("فشل الدمج، تأكد أن المقاطع بصيغة mp4.");
     const data = await f.readFile("out.mp4"), outBlob = new Blob([data], { type: "video/mp4" });
     const fn = (cur && cur.name ? cur.name : "ad").replace(/[^\w\u0600-\u06FF]+/g, "_");
@@ -335,7 +358,7 @@ async function merge() {
 
 /* ---------- Projects ---------- */
 let cur = null, saveT;
-const FIELDS = ["name", "desc", "aud", "offer", "type", "lang", "tone", "style", "people", "ratio", "dur", "ucond", "uuse", "udef", "uwork", "ureason", "uprice", "udisc"];
+const FIELDS = ["name", "desc", "aud", "offer", "type", "lang", "tone", "style", "people", "ratio", "dur", "ucond", "uuse", "udef", "uwork", "ureason", "uprice", "udisc", "mode", "drel", "dnameA", "dnameB", "prob"];
 const LN = { darija: "دارجة", mix: "دارجة + فرنسية", fusha: "فصحى" };
 const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
 const DB = {
@@ -366,7 +389,7 @@ async function renderProjects() {
 }
 async function openProject(id) {
   const p = await DB.get(id); if (!p) return;
-  cur = p; shots = p.shots; audioBlob = p.audio || null;
+  cur = p; shots = p.shots; audioBlob = p.audio || null; dlgMode = p.form.mode === "dialogue";
   FIELDS.forEach(k => { if (p.form[k] !== undefined) $("#" + k).value = p.form[k]; }); toggleUsed(); if (p.voice) $("#voice").value = p.voice;
   imgs = []; resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }); if (audioBlob) showAudio(); renderProjects();
 }
@@ -386,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
   $("#wmText").value = S.get("wmText", "نموذج للمعاينة"); $("#wmBrand").value = S.get("wmBrand", ""); $("#wmOp").value = S.get("wmOp", "0.75"); $("#wm2").value = S.get("wm2", "no");
   initModels(); renderProjects(); navigator.storage?.persist?.();
-  $("#btnNew").onclick = newProject; $("#type").onchange = toggleUsed; $("#btnDef").onclick = detectDefects; toggleUsed();
+  $("#btnNew").onclick = newProject; $("#type").onchange = toggleUsed; $("#mode").onchange = toggleUsed; $("#btnDef").onclick = detectDefects; toggleUsed();
   $("#img").onchange = e => addImages(e.target.files);
   $("#gallery").addEventListener("click", e => { const r = e.target.dataset.rm; if (r != null && imgs.length) { imgs.splice(+r, 1); renderGallery(imgs.map(x => x.t), [], true); } });
   $("#projects").addEventListener("click", async e => {

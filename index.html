@@ -27,6 +27,7 @@
   <h2>1. المنتج</h2>
   <label>اسم المنتج أو الخدمة<input id="name"></label>
   <label>وصف قصير ومميزاته<textarea id="desc" rows="3"></textarea></label>
+  <label>المشكلة التي يحلها المنتج (اختياري، سطر لكل مشكلة، ويمكن كتابة الحل بعد ←)<textarea id="prob" rows="3" placeholder="مثال: الحذاء يتعب القدم عند المشي الطويل ← نعل طبي مريح"></textarea></label>
   <label>الجمهور المستهدف<input id="aud" placeholder="مثال: شباب، ربات البيوت، أصحاب المحلات"></label>
   <label>العرض / الدعوة لاتخاذ إجراء<input id="offer" placeholder="مثال: التوصيل لـ 58 ولاية، السعر 2500 دج، اتصل على 05..."></label>
   <label>صور المنتج أو المكان (حتى 6، اختياري). إن لم تُضَف إلا صورة واحدة، اضغط الزر مرة أخرى لإضافة غيرها<input id="img" type="file" accept="image/*" multiple></label>
@@ -37,9 +38,15 @@
     <label>النبرة<select id="tone"><option value="energetic">حماسي</option><option value="luxury">فاخر</option><option value="funny">فكاهي</option><option value="emotional">عاطفي</option><option value="urgent limited offer">عاجل</option></select></label>
     <label>الأسلوب البصري<select id="style"><option value="cinematic commercial">سينمائي</option><option value="UGC handheld authentic">UGC عفوي</option><option value="minimal clean studio">بسيط ونظيف</option><option value="vibrant colorful">ألوان زاهية</option></select></label>
     <label>الأشخاص<select id="people"><option value="with people">مع أشخاص</option><option value="no people, product only">المنتج فقط</option></select></label>
+    <label>طريقة العرض<select id="mode"><option value="voice">تعليق صوتي</option><option value="dialogue">حوار بين شخصين (في Flow)</option></select></label>
     <label>الصيغة<select id="ratio"><option>9:16</option><option>16:9</option><option>1:1</option></select></label>
     <label>المدة<select id="dur"><option value="10">10 ثوانٍ</option><option value="20" selected>20 ثانية</option><option value="30">30 ثانية</option><option value="40">40 ثانية</option></select></label>
     <label>الصوت<select id="voice"></select></label>
+  </div>
+  <div id="dlgBox" hidden>
+    <p class="mut">الحوار يُكتب داخل برومبت Flow ويولّده Flow بصوته مع الفيديو، فلا يُستعمل صوت التطبيق. جرّب لقطة واحدة أولاً: جودة الدارجة وثبات الأصوات بين اللقطات غير مضمونين.</p>
+    <label>العلاقة بين الشخصين<select id="drel"><option value="a customer and a shop seller">زبون وبائع</option><option value="two male friends">صديقان</option><option value="two female friends">صديقتان</option><option value="a young man and a young woman who are friends">صديق وصديقة</option><option value="a husband and a wife">زوجان</option><option value="a mother and her adult daughter">أم وابنتها</option></select></label>
+    <div class="grid"><label>اسم الأول (صاحب المشكلة)<input id="dnameA"></label><label>اسم الثاني (المجيب)<input id="dnameB"></label></div>
   </div>
   <div id="usedBox" hidden>
     <label>الحالة العامة<select id="ucond"><option value="excellent">ممتازة</option><option value="good" selected>جيدة</option><option value="fair">متوسطة</option><option value="has clear defects">بها عيوب واضحة</option></select></label>
@@ -74,6 +81,7 @@
   <h2>4. الدمج</h2>
   <label>مقاطع Flow (mp4)<input id="clips" type="file" accept="video/*" multiple></label>
   <ol id="clipList"></ol>
+  <label>صوت الفيديو<select id="keepAudio"><option value="replace">استبدال بالتعليق المولد في التطبيق</option><option value="keep">الإبقاء على صوت مقاطع Flow (حوار)</option></select></label>
   <label>إنشاء نسخة معاينة بشريط مائل<select id="mkPrev"><option value="yes">نعم</option><option value="no">لا</option></select></label>
   <div class="row"><button id="btnMerge" class="main">ادمج الفيديو مع الصوت</button></div>
   <h3 id="out-lbl" hidden>النسخة الأصلية (بعد الدفع)</h3>
