@@ -20,8 +20,7 @@
 <div id="status" role="status" hidden></div>
 <main id="viewMain">
 <section>
-  <div class="row between"><h2>مشاريعي</h2><button id="btnNew">+ مشروع جديد</button></div>
-  <div id="projects" class="cards"></div>
+  <div class="row"><button id="btnNew" class="main">إعلان جديد</button><button id="btnAds">إعلاناتي</button></div>
 </section>
 <section>
   <h2>1. المنتج</h2>
@@ -91,6 +90,13 @@
   <video id="prev" controls playsinline hidden></video>
   <div class="row"><a id="prev-dl" class="btn" hidden download="preview.mp4">تحميل المعاينة</a><button id="prev-sh" hidden>مشاركة</button></div>
   <div class="row"><button id="btnPort" hidden>حفظ في معرض الأعمال</button></div>
+</section>
+</main>
+<main id="viewAds" hidden>
+<section>
+  <div class="row between"><h2>إعلاناتي</h2><button id="btnAdsBack">← رجوع</button></div>
+  <p class="mut">إعلاناتك المحفوظة على هذا الجهاز، وما اكتمل منها يظهر بنسختيه (الأصلية والمعاينة).</p>
+  <div id="adsList" class="ads"></div>
 </section>
 </main>
 <main id="viewBiz" hidden>

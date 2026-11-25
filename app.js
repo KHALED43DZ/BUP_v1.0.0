@@ -1,4 +1,4 @@
-const VERSION = "1.7.1";
+const VERSION = "1.8.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -344,10 +344,11 @@ async function merge() {
     const data = await f.readFile("out.mp4"), outBlob = new Blob([data], { type: "video/mp4" });
     const fn = (cur && cur.name ? cur.name : "ad").replace(/[^\w\u0600-\u06FF]+/g, "_");
     setOut("out", outBlob, fn + "_original.mp4");
+    if (cur) { cur.out = outBlob; cur.prev = null; cur.fn = fn; await saveCur(); renderProjects(); }
     for (let i = 0; i < clips.length; i++) await f.deleteFile(`c${i}.mp4`).catch(() => { });
     msg("تم الدمج." + note);
     if ($("#mkPrev").value === "yes") {
-      try { window.__ph = "إنشاء المعاينة"; setOut("prev", await makePreview(f, outBlob), fn + "_preview.mp4"); msg("تم إنشاء النسختين." + note); }
+      try { window.__ph = "إنشاء المعاينة"; const pb = await makePreview(f, outBlob); setOut("prev", pb, fn + "_preview.mp4"); if (cur) { cur.prev = pb; await saveCur(); renderProjects(); } msg("تم إنشاء النسختين." + note); }
       catch (e) { msg("تم الدمج، لكن تعذر إنشاء المعاينة: " + errText(e), true); }
       window.__ph = "الدمج";
     }
@@ -384,25 +385,41 @@ function showAudio() {
   a.src = url; a.hidden = false; $("#aud-dl").href = url; $("#aud-dl").hidden = false;
   a.onloadedmetadata = () => $("#aud-info").textContent = `مدة الصوت ${a.duration.toFixed(1)} ث، ومدة الفيديو المتوقعة ${shots.length * 10} ث.` + (a.duration > shots.length * 10 ? " الصوت أطول من الفيديو: سيُسرَّع قليلاً عند الدمج، والأفضل اختصار النص." : "");
 }
+const adsCache = {}; let adsUrls = [];
 async function renderProjects() {
-  let list; try { list = ((await DB.all()) || []).sort((x, y) => y.updated - x.updated); } catch (e) { $("#projects").innerHTML = `<p class="mut">تعذر قراءة المشاريع: ${esc(errText(e))}</p>`; return; }
-  $("#projects").innerHTML = list.length ? list.map(p => `<div class="card${cur && cur.id === p.id ? " on" : ""}">
-    ${(p.thumbs && p.thumbs[0]) || p.thumb ? `<img src="data:image/jpeg;base64,${(p.thumbs && p.thumbs[0]) || p.thumb}" alt="">` : `<div class="ph">▶</div>`}
-    <b>${esc(p.name)}</b><span class="mut">${p.shots.length * 10} ث · ${LN[p.form.lang] || ""} · ${new Date(p.updated).toLocaleDateString("fr-FR")}${p.audio ? " · 🔊" : ""}</span>
-    <div class="row"><button data-open="${p.id}">فتح</button><button data-del="${p.id}">حذف</button></div></div>`).join("")
-    : `<p class="mut">لا توجد مشاريع بعد. أول إعلان تنشئه سيُحفظ هنا تلقائياً.</p>`;
+  let list; try { list = ((await DB.all()) || []).sort((x, y) => y.updated - x.updated); } catch (e) { $("#adsList").innerHTML = `<p class="mut">تعذر قراءة الإعلانات: ${esc(errText(e))}</p>`; return; }
+  list.forEach(p => adsCache[p.id] = p);
+  $("#btnAds").textContent = "إعلاناتي" + (list.length ? " (" + list.length + ")" : "");
+  if ($("#viewAds").hidden) return;
+  adsUrls.forEach(u => URL.revokeObjectURL(u)); adsUrls = [];
+  const vid = (p, k, label) => { const u = URL.createObjectURL(p[k]); adsUrls.push(u); return `<figure><figcaption>${label}</figcaption><video src="${u}#t=0.1" controls playsinline preload="metadata"></video><div class="row"><button data-sh="${p.id}|${k}">مشاركة</button><button data-dl="${p.id}|${k}">تحميل</button></div></figure>`; };
+  $("#adsList").innerHTML = list.length ? list.map(p => {
+    const th = (p.thumbs && p.thumbs[0]) || p.thumb, done = p.out || p.prev;
+    return `<div class="card ad${cur && cur.id === p.id ? " on" : ""}"><div class="adh">${th ? `<img src="data:image/jpeg;base64,${th}" alt="">` : `<div class="ph">▶</div>`}<div><b>${esc(p.name)}</b><span class="mut">${p.shots.length * 10} ث · ${LN[p.form.lang] || ""} · ${new Date(p.updated).toLocaleDateString("fr-FR")}${p.audio ? " · 🔊" : ""}</span><span class="chip${done ? " ok" : ""}">${done ? "فيديو جاهز" : "بدون فيديو بعد"}</span></div></div>
+      ${done ? `<div class="vids">${p.out ? vid(p, "out", "النسخة الأصلية") : ""}${p.prev ? vid(p, "prev", "نسخة المعاينة") : ""}</div>` : ""}
+      <div class="row"><button data-open="${p.id}">فتح للتعديل أو الإكمال</button><button data-del="${p.id}">حذف</button></div></div>`;
+  }).join("") : `<p class="mut">لا توجد إعلانات بعد. أول إعلان تنشئه سيُحفظ هنا تلقائياً.</p>`;
 }
+function resetOut() {
+  ["out", "prev"].forEach(id => { const v = $("#" + id); v.removeAttribute("src"); try { v.load(); } catch (e) { } ["", "-dl", "-sh", "-lbl"].forEach(s => $("#" + id + s).hidden = true); });
+  window.__last = {}; $("#btnPort").hidden = true;
+}
+function showMain() { $("#viewAds").hidden = true; $("#viewBiz").hidden = true; $("#viewMain").hidden = false; window.scrollTo(0, 0); }
+async function openAds() { $("#viewMain").hidden = true; $("#viewBiz").hidden = true; $("#viewAds").hidden = false; window.scrollTo(0, 0); await renderProjects(); }
 async function openProject(id, quiet = false) {
   const p = await DB.get(id); if (!p) return;
   cur = p; shots = p.shots; audioBlob = p.audio || null; dlgMode = p.form.mode === "dialogue";
   if (!quiet) { FIELDS.forEach(k => { if (p.form[k] !== undefined) $("#" + k).value = p.form[k]; }); if (p.voice) $("#voice").value = p.voice; toggleUsed(); saveDraft(); S.set("curId", id); }
-  imgs = []; resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }, quiet); if (audioBlob) showAudio(); renderProjects();
+  imgs = []; resetAudioUI(); renderGallery((p.thumbs || []).map(t => "data:image/jpeg;base64," + t), p.images); renderShots({ caption: p.caption }, quiet); if (audioBlob) showAudio();
+  resetOut(); const fn0 = p.fn || "ad"; if (p.out) setOut("out", p.out, fn0 + "_original.mp4"); if (p.prev) setOut("prev", p.prev, fn0 + "_preview.mp4");
+  renderProjects();
 }
 function newProject() {
   cur = null; shots = []; audioBlob = null; resetAudioUI();
   FIELDS.forEach(k => { const e = $("#" + k); if (e.tagName === "SELECT") { const i = [...e.options].findIndex(o => o.defaultSelected); e.selectedIndex = i >= 0 ? i : 0; } else e.value = ""; });
   S.set("curId", ""); S.set("draft", null); toggleUsed();
   $("#img").value = ""; imgs = []; renderGallery([]); ["secRes", "secAud", "secMerge"].forEach(id => $("#" + id).hidden = true);
+  resetOut(); clips = []; $("#clips").value = ""; renderClips(); msg("");
   renderProjects(); window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -420,11 +437,18 @@ document.addEventListener("DOMContentLoaded", () => {
   { const cid = S.get("curId", ""); if (cid) openProject(cid, true).catch(() => { }); }
   $("#img").onchange = e => addImages(e.target.files);
   $("#gallery").addEventListener("click", e => { const r = e.target.dataset.rm; if (r != null && imgs.length) { imgs.splice(+r, 1); renderGallery(imgs.map(x => x.t), [], true); } });
-  $("#projects").addEventListener("click", async e => {
+  $("#adsList").addEventListener("click", async e => {
     const d = e.target.dataset;
-    if (d.open) openProject(d.open);
-    if (d.del && confirm("حذف هذا المشروع نهائياً؟")) { await DB.del(d.del); if (cur && cur.id === d.del) { cur = null; S.set("curId", ""); } renderProjects(); }
+    if (d.open) { await openProject(d.open); showMain(); setTimeout(() => $("#secRes").scrollIntoView({ behavior: "smooth" }), 80); }
+    if (d.del && confirm("حذف هذا الإعلان نهائياً؟")) { await DB.del(d.del); if (cur && cur.id === d.del) { cur = null; S.set("curId", ""); } renderProjects(); }
+    const k = d.sh || d.dl;
+    if (k) {
+      const [id, w] = k.split("|"), p = adsCache[id]; if (!p || !p[w]) return;
+      const name = (p.fn || "ad") + (w === "out" ? "_original.mp4" : "_preview.mp4");
+      if (d.sh) shareBlob(p[w], name); else { const x = document.createElement("a"); x.href = URL.createObjectURL(p[w]); x.download = name; x.click(); }
+    }
   });
+  $("#btnAds").onclick = openAds; $("#btnAdsBack").onclick = showMain;
   $("#btnSet").onclick = () => $("#dlg").showModal();
   $("#btnSave").onclick = () => {
     S.set("kText", $("#kText").value); S.set("kAudio", $("#kAudio").value);

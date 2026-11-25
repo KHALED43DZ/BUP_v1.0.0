@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try { if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file] }); else msg("المشاركة المباشرة غير مدعومة، استعمل التحميل.", true); }
     catch (e) { if (e.name !== "AbortError") msg("تعذرت المشاركة: " + errText(e), true); }
   };
-  const show = b => { $("#viewBiz").hidden = !b; $("#viewMain").hidden = b; window.scrollTo(0, 0); if (b) { draw(); renderTpl(); renderPort(); } };
+  const show = b => { $("#viewAds").hidden = true; $("#viewBiz").hidden = !b; $("#viewMain").hidden = b; window.scrollTo(0, 0); if (b) { draw(); renderTpl(); renderPort(); } };
   $("#btnBiz").onclick = () => show($("#viewBiz").hidden);
   $("#btnBack").onclick = () => show(false);
 

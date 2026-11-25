@@ -55,3 +55,12 @@ input[type=color]{height:42px;padding:2px}
 #card{display:block;width:100%;height:auto;margin:10px 0;border-radius:8px;border:1px solid var(--line)}
 header .icon{padding:2px 8px}
 .card video{width:100%;border-radius:6px;background:#000}
+.ads{display:grid;gap:12px}
+.card.ad .adh{display:flex;gap:10px;align-items:center}
+.card.ad .adh img,.card.ad .adh .ph{width:72px;height:72px;aspect-ratio:auto;flex:none}
+.card.ad .adh>div:last-child{display:flex;flex-direction:column;min-width:0}
+.vids{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vids figure{margin:0}.vids figcaption{font-size:.8rem;color:var(--mut)}
+.vids video{max-height:280px}
+.chip{align-self:flex-start;font-size:.75rem;border:1px solid var(--line);border-radius:10px;padding:0 8px;color:var(--mut)}
+.chip.ok{color:var(--g);border-color:var(--g)}
