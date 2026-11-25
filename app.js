@@ -1,4 +1,4 @@
-const VERSION = "1.8.0";
+const VERSION = "1.8.1";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -386,19 +386,26 @@ function showAudio() {
   a.onloadedmetadata = () => $("#aud-info").textContent = `مدة الصوت ${a.duration.toFixed(1)} ث، ومدة الفيديو المتوقعة ${shots.length * 10} ث.` + (a.duration > shots.length * 10 ? " الصوت أطول من الفيديو: سيُسرَّع قليلاً عند الدمج، والأفضل اختصار النص." : "");
 }
 const adsCache = {}; let adsUrls = [];
+const isBlob = b => !!b && typeof b === "object" && typeof b.size === "number" && typeof b.type === "string";
 async function renderProjects() {
-  let list; try { list = ((await DB.all()) || []).sort((x, y) => y.updated - x.updated); } catch (e) { $("#adsList").innerHTML = `<p class="mut">تعذر قراءة الإعلانات: ${esc(errText(e))}</p>`; return; }
+  let list; try { list = ((await DB.all()) || []).sort((x, y) => (y.updated || y.created || 0) - (x.updated || x.created || 0)); } catch (e) { $("#adsList").innerHTML = `<p class="mut">تعذر قراءة الإعلانات: ${esc(errText(e))}</p>`; return; }
   list.forEach(p => adsCache[p.id] = p);
   $("#btnAds").textContent = "إعلاناتي" + (list.length ? " (" + list.length + ")" : "");
   if ($("#viewAds").hidden) return;
   adsUrls.forEach(u => URL.revokeObjectURL(u)); adsUrls = [];
   const vid = (p, k, label) => { const u = URL.createObjectURL(p[k]); adsUrls.push(u); return `<figure><figcaption>${label}</figcaption><video src="${u}#t=0.1" controls playsinline preload="metadata"></video><div class="row"><button data-sh="${p.id}|${k}">مشاركة</button><button data-dl="${p.id}|${k}">تحميل</button></div></figure>`; };
-  $("#adsList").innerHTML = list.length ? list.map(p => {
-    const th = (p.thumbs && p.thumbs[0]) || p.thumb, done = p.out || p.prev;
-    return `<div class="card ad${cur && cur.id === p.id ? " on" : ""}"><div class="adh">${th ? `<img src="data:image/jpeg;base64,${th}" alt="">` : `<div class="ph">▶</div>`}<div><b>${esc(p.name)}</b><span class="mut">${p.shots.length * 10} ث · ${LN[p.form.lang] || ""} · ${new Date(p.updated).toLocaleDateString("fr-FR")}${p.audio ? " · 🔊" : ""}</span><span class="chip${done ? " ok" : ""}">${done ? "فيديو جاهز" : "بدون فيديو بعد"}</span></div></div>
-      ${done ? `<div class="vids">${p.out ? vid(p, "out", "النسخة الأصلية") : ""}${p.prev ? vid(p, "prev", "نسخة المعاينة") : ""}</div>` : ""}
-      <div class="row"><button data-open="${p.id}">فتح للتعديل أو الإكمال</button><button data-del="${p.id}">حذف</button></div></div>`;
-  }).join("") : `<p class="mut">لا توجد إعلانات بعد. أول إعلان تنشئه سيُحفظ هنا تلقائياً.</p>`;
+  const btns = p => `<div class="row"><button data-open="${esc(p.id)}">فتح للتعديل أو الإكمال</button><button data-del="${esc(p.id)}">حذف</button></div>`;
+  const card = p => {
+    try {
+      const f = p.form || {}, n = Array.isArray(p.shots) ? p.shots.length : 0, th = (p.thumbs && p.thumbs[0]) || p.thumb;
+      const hasOut = isBlob(p.out), hasPrev = isBlob(p.prev), done = hasOut || hasPrev, when = new Date(p.updated || p.created || Date.now()).toLocaleDateString("fr-FR");
+      return `<div class="card ad${cur && cur.id === p.id ? " on" : ""}"><div class="adh">${th ? `<img src="data:image/jpeg;base64,${th}" alt="">` : `<div class="ph">▶</div>`}<div><b>${esc(p.name || "إعلان بلا اسم")}</b><span class="mut">${n ? n * 10 + " ث · " : ""}${LN[f.lang] || ""} · ${when}${isBlob(p.audio) ? " · 🔊" : ""}</span><span class="chip${done ? " ok" : ""}">${done ? "فيديو جاهز" : "بدون فيديو بعد"}</span></div></div>
+      ${done ? `<div class="vids">${hasOut ? vid(p, "out", "النسخة الأصلية") : ""}${hasPrev ? vid(p, "prev", "نسخة المعاينة") : ""}</div>` : ""}${btns(p)}</div>`;
+    } catch (e) {
+      return `<div class="card ad"><b>${esc((p && p.name) || "إعلان")}</b><span class="mut">تعذر عرض كامل تفاصيله</span>${btns(p || {})}</div>`;
+    }
+  };
+  $("#adsList").innerHTML = list.length ? list.map(card).join("") : `<p class="mut">لا توجد إعلانات بعد. أول إعلان تنشئه سيُحفظ هنا تلقائياً.</p>`;
 }
 function resetOut() {
   ["out", "prev"].forEach(id => { const v = $("#" + id); v.removeAttribute("src"); try { v.load(); } catch (e) { } ["", "-dl", "-sh", "-lbl"].forEach(s => $("#" + id + s).hidden = true); });
