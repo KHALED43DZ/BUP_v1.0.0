@@ -1,4 +1,4 @@
-const VERSION = "1.8.1";
+const VERSION = "1.9.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -266,7 +266,7 @@ function setOut(id, blob, name) {
   $("#" + id).src = u; d.href = u; d.download = name;
   ["", "-dl", "-sh", "-lbl"].forEach(s => $("#" + id + s).hidden = false);
   $("#" + id + "-sh").onclick = () => shareBlob(blob, name);
-  (window.__last = window.__last || {})[id] = { blob, name }; $("#btnPort").hidden = false;
+  (window.__last = window.__last || {})[id] = { blob, name }; $("#btnPort").hidden = false; $("#portType").hidden = false; $("#portType").value = $("#type").selectedOptions[0].textContent;
 }
 async function shareBlob(b, name) {
   const file = new File([b], name, { type: "video/mp4" });
@@ -312,7 +312,7 @@ async function merge() {
   const keep = $("#keepAudio").value === "keep";
   if (!keep && !audioBlob) return msg("ولّد الصوت أولاً.", true);
   if (!clips.length) return msg("ارفع مقاطع Flow أولاً.", true);
-  $("#btnMerge").disabled = true; ["prev", "prev-dl", "prev-sh", "prev-lbl"].forEach(i => $("#" + i).hidden = true); window.__last = {}; $("#btnPort").hidden = true;
+  $("#btnMerge").disabled = true; ["prev", "prev-dl", "prev-sh", "prev-lbl"].forEach(i => $("#" + i).hidden = true); window.__last = {}; $("#btnPort").hidden = true; $("#portType").hidden = true;
   try {
     const f = await loadFF(); msg("جاري الدمج…");
     if (!keep) await f.writeFile("a.wav", new Uint8Array(await audioBlob.arrayBuffer()));
@@ -409,7 +409,7 @@ async function renderProjects() {
 }
 function resetOut() {
   ["out", "prev"].forEach(id => { const v = $("#" + id); v.removeAttribute("src"); try { v.load(); } catch (e) { } ["", "-dl", "-sh", "-lbl"].forEach(s => $("#" + id + s).hidden = true); });
-  window.__last = {}; $("#btnPort").hidden = true;
+  window.__last = {}; $("#btnPort").hidden = true; $("#portType").hidden = true;
 }
 function showMain() { $("#viewAds").hidden = true; $("#viewBiz").hidden = true; $("#viewMain").hidden = false; window.scrollTo(0, 0); }
 async function openAds() { $("#viewMain").hidden = true; $("#viewBiz").hidden = true; $("#viewAds").hidden = false; window.scrollTo(0, 0); await renderProjects(); }
@@ -439,6 +439,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#kText").value = S.get("kText", ""); $("#kAudio").value = S.get("kAudio", "");
   $("#wmText").value = S.get("wmText", "نموذج للمعاينة"); $("#wmBrand").value = S.get("wmBrand", ""); $("#wmOp").value = S.get("wmOp", "0.75"); $("#wm2").value = S.get("wm2", "no");
   initModels(); renderProjects(); navigator.storage?.persist?.();
+  $("#portType").innerHTML = [...$("#type").options].map(o => `<option>${o.textContent}</option>`).join("") + "<option>أخرى</option>";
   $("#btnNew").onclick = newProject; $("#type").onchange = toggleUsed; $("#mode").onchange = toggleUsed; $("#btnDef").onclick = detectDefects; restoreDraft(); toggleUsed();
   $("#viewMain").addEventListener("input", saveDraft); $("#viewMain").addEventListener("change", saveDraft);
   { const cid = S.get("curId", ""); if (cid) openProject(cid, true).catch(() => { }); }

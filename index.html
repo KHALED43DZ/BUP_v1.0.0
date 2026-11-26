@@ -89,7 +89,7 @@
   <h3 id="prev-lbl" hidden>نسخة المعاينة (للزبون)</h3>
   <video id="prev" controls playsinline hidden></video>
   <div class="row"><a id="prev-dl" class="btn" hidden download="preview.mp4">تحميل المعاينة</a><button id="prev-sh" hidden>مشاركة</button></div>
-  <div class="row"><button id="btnPort" hidden>حفظ في معرض الأعمال</button></div>
+  <div class="row"><select id="portType" hidden style="width:auto"></select><button id="btnPort" hidden>حفظ في معرض الأعمال</button></div>
 </section>
 </main>
 <main id="viewAds" hidden>
@@ -153,7 +153,27 @@
 </section>
 <section>
   <h2>معرض أعمالي</h2>
+  <p class="mut">اختر نوع كل عمل من القائمة تحت اسمه، فيظهر وسماً على الفيديو في صفحة الهبوط.</p>
   <div id="portList" class="cards"></div>
+</section>
+<section>
+  <h2>صفحة هبوط لخدمتي</h2>
+  <p class="mut">تُنشأ من بياناتك وباقاتك وعرضك وفيديوهات معرض أعمالك، وتخرج كملف ZIP جاهز للرفع إلى GitHub.</p>
+  <label>العنوان الرئيسي<input id="lpHead"></label>
+  <label>جملة تعريفية<textarea id="lpSub" rows="2"></textarea></label>
+  <label>نص زر الدعوة<input id="lpCta"></label>
+  <label>خطوات العمل (سطر لكل خطوة)<textarea id="lpSteps" rows="4"></textarea></label>
+  <label>أسئلة شائعة (سطر لكل سؤال بصيغة: السؤال | الجواب)<textarea id="lpFaq" rows="4"></textarea></label>
+  <div class="row"><button id="btnLpAi">اقتراح صياغات بـ Gemini</button></div>
+  <div class="grid">
+    <label>إظهار الأسعار<select id="lpPrices"><option value="yes">نعم</option><option value="no">لا</option></select></label>
+    <label>ملاحظة: مُعدّة بمساعدة الذكاء الاصطناعي<select id="lpDisc"><option value="yes">نعم</option><option value="no">لا</option></select></label>
+  </div>
+  <label>رابط الموقع النهائي (اختياري، لصورة المعاينة عند المشاركة)<input id="lpUrl" dir="ltr" placeholder="https://username.github.io/repo-name/"></label>
+  <h3>الفيديوهات المضمنة</h3>
+  <div id="lpVids"></div>
+  <div class="row"><button id="btnLpPrev">معاينة الصفحة</button><button id="btnLpZip" class="main">تحميل ZIP لـ GitHub</button></div>
+  <p id="lpMsg" class="mut"></p>
 </section>
 </main>
 
@@ -173,5 +193,6 @@
 </dialog>
 <script src="app.js"></script>
 <script src="biz.js"></script>
+<script src="landing.js"></script>
 </body>
 </html>

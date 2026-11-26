@@ -4,7 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
     pkgs: [{ name: "إعلان واحد", inc: "فيديو 10 إلى 15 ثانية مع تعليق صوتي بالدارجة", price: "", sale: "" }], logo: ""
   };
   const saved = S.get("biz", {});
-  const biz = { f: Object.assign({}, DEF.f, saved.f), pkgs: saved.pkgs || DEF.pkgs, logo: saved.logo || "" };
+  const biz = { f: Object.assign({}, DEF.f, saved.f), pkgs: saved.pkgs || DEF.pkgs, logo: saved.logo || "", lp: saved.lp || {}, unsel: saved.unsel || [] };
+  const TYPE_OPTS = [...$("#type").options].map(o => o.textContent).concat("أخرى");
   const save = () => S.set("biz", biz);
   const THEMES = {
     green: { a: "#0f1f1a", b: "#11161b", t: "#ffffff", m: "#9fb0aa", box: "rgba(255,255,255,.07)" },
@@ -186,10 +187,15 @@ document.addEventListener("DOMContentLoaded", () => {
   async function renderPort() {
     let list; try { list = ((await W.all()) || []).sort((x, y) => y.created - x.created); } catch (e) { $("#portList").innerHTML = `<p class="mut">تعذر قراءة المعرض: ${esc(errText(e))}</p>`; return; }
     portCache = Object.fromEntries(list.map(w => [w.id, w]));
-    $("#portList").innerHTML = list.length ? list.map(w => `<div class="card"><video src="${URL.createObjectURL(w.blob)}#t=0.1" controls playsinline preload="metadata"></video><b>${esc(w.title)}</b><span class="mut">${new Date(w.created).toLocaleDateString("fr-FR")}</span>
+    $("#portList").innerHTML = list.length ? list.map(w => `<div class="card"><video src="${URL.createObjectURL(w.blob)}#t=0.1" controls playsinline preload="metadata"></video><b>${esc(w.title)}</b><span class="mut">${new Date(w.created).toLocaleDateString("fr-FR")}</span><select data-wtag="${w.id}">${TYPE_OPTS.map(t => `<option${t === ((w.tags && w.tags[0]) || "أخرى") ? " selected" : ""}>${t}</option>`).join("")}</select>
       <div class="row"><button data-wsh="${w.id}">مشاركة</button><button data-wdl="${w.id}">تحميل</button><button data-wdel="${w.id}">حذف</button></div></div>`).join("")
       : `<p class="mut">لا توجد أعمال بعد. بعد دمج إعلان اضغط «حفظ في معرض الأعمال».</p>`;
+    if (window.renderLanding) window.renderLanding();
   }
+  $("#portList").addEventListener("change", async e => {
+    const id = e.target.dataset.wtag, w = portCache[id]; if (!id || !w) return;
+    w.tags = [e.target.value, ...(w.tags || []).slice(1)]; await W.put(w); if (window.renderLanding) window.renderLanding();
+  });
   $("#portList").addEventListener("click", async e => {
     const d = e.target.dataset, w = portCache[d.wsh || d.wdl || d.wdel]; if (!w) return;
     if (d.wsh) shareBlob(w.blob, w.name);
@@ -199,8 +205,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#btnPort").onclick = async () => {
     const it = (window.__last || {}).prev || (window.__last || {}).out; if (!it) return;
     const title = prompt("عنوان العمل في المعرض:", it.name.replace(/_(preview|original)\.mp4$/, "")); if (title === null) return;
-    try { await W.put({ id: Date.now().toString(36), title: title || "عمل", created: Date.now(), blob: it.blob, name: it.name }); msg("تم الحفظ في معرض الأعمال."); setTimeout(() => msg(""), 2000); renderPort(); }
+    try { await W.put({ id: Date.now().toString(36), title: title || "عمل", created: Date.now(), blob: it.blob, name: it.name, tags: [$("#portType").value || "أخرى", ...(dlgMode ? ["حوار"] : [])] }); msg("تم الحفظ في معرض الأعمال."); setTimeout(() => msg(""), 2000); renderPort(); }
     catch (err) { msg("تعذر الحفظ: " + errText(err), true); }
   };
+  window.BIZ = { biz, offer, sale, num, THEMES, save, getPort: async () => (await W.all()) || [] };
   renderPkgs(); noteOffer(); loadLogo(biz.logo); renderTpl(); renderPort();
 });
