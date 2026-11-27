@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ---- assets ---- */
+  const b64Blob = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: "image/jpeg" }); };
   const poster = blob => new Promise(ok => {
     const v = document.createElement("video"), u = URL.createObjectURL(blob);
     const done = r => { URL.revokeObjectURL(u); ok(r); };
@@ -70,7 +71,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const w = items[i], vn = "videos/ad-" + (i + 1) + ".mp4", pn = "posters/ad-" + (i + 1) + ".jpg";
       await add(vn, w.blob); if (w.blob.size > 8 * 1048576) warn.push(w.title + ": " + (w.blob.size / 1048576).toFixed(1) + " MB");
       const pb = await poster(w.blob); if (pb) await add(pn, pb);
-      cards.push({ w, vn, pn: pb ? pn : "", dur: Math.round(await durOf(w.blob)) });
+      const phs = (w.show !== false && Array.isArray(w.photos)) ? w.photos.slice(0, 3) : [], pnames = [];
+      for (let k = 0; k < phs.length; k++) { const nm = "photos/ad-" + (i + 1) + "-" + (k + 1) + ".jpg"; await add(nm, b64Blob(phs[k])); pnames.push(nm); }
+      cards.push({ w, vn, pn: pb ? pn : "", ph: pnames, dur: Math.round(await durOf(w.blob)) });
     }
     if (biz.logo) { try { await add("logo.png", await (await fetch(biz.logo)).blob()); } catch (e) { } }
     await add("og.jpg", await ogBlob());
@@ -143,8 +146,22 @@ footer{padding:56px 0 96px;border-top:2px solid ${rgba(acc, .5)};text-align:cent
 #md{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:16px}#md.on{display:flex}
 .mb{width:100%;max-width:420px;background:var(--bg2);border:1px solid var(--line);border-radius:24px;overflow:hidden}.mh{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}.mh h4{font-weight:900}.mh span{font-size:.75rem;font-weight:800;color:var(--acc2)}
 .mx{width:36px;height:36px;border-radius:50%;background:var(--bg)}.mx:hover{background:var(--acc);color:var(--on)}#mw{aspect-ratio:9/16;max-height:62vh;width:100%;background:#000;margin:0 auto}.mf{padding:14px;background:var(--bg);display:flex;justify-content:space-between;align-items:center;gap:10px}.mf span{font-size:.78rem;font-weight:700;color:var(--mut)}.mf button{padding:9px 14px;border-radius:12px;background:var(--wa);color:#04210f;font-weight:900;font-size:.78rem}
+.vc.ba{flex:1 1 100%}@media(min-width:960px){.vc.ba{flex:0 1 calc(50% - 11px)}}
+.pair{position:relative;display:flex}.pair>.ph1,.pair>.vt{flex:1 1 50%;min-width:0;aspect-ratio:9/14}.ph1{background-size:cover;background-position:center;background-color:var(--bg2);cursor:zoom-in;position:relative}
+.cnt{position:absolute;top:12px;right:12px;background:rgba(0,0,0,.65);color:#fff;border-radius:999px;padding:0 10px;font-size:.75rem;font-weight:800}
+.arr{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;border-radius:50%;background:var(--acc);color:var(--on);display:grid;place-items:center;font-weight:900;font-size:1.2rem;z-index:2;box-shadow:0 6px 18px #0007}
+.cap{display:flex}.cap span{flex:1;text-align:center;font-size:.75rem;font-weight:700;color:var(--mut);padding:8px 0;border-bottom:1px solid var(--line)}.q{color:var(--mut);font-size:.82rem;margin-top:6px}
+.ba .pl i{width:46px;height:46px}.ba .pl span{display:none}.ba .vt{padding:10px}.ba .vt .r{flex-direction:column;align-items:flex-start;gap:6px}.ba .chp{font-size:.68rem;padding:1px 8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ba .du{font-size:.68rem;padding:1px 8px}.ba .cnt{top:10px;right:10px}
+#lb{position:fixed;inset:0;z-index:70;display:none;background:rgba(0,0,0,.92);overflow:auto;padding:60px 14px 24px;text-align:center}#lb.on{display:block}#lb img{max-width:100%;max-height:82vh;border-radius:16px;margin:0 auto 14px;display:block}#lb p{color:#fff;font-weight:800;margin-bottom:14px}.lbx{position:fixed;top:14px;left:14px;width:42px;height:42px;border-radius:50%;background:var(--acc);color:var(--on);font-size:1.1rem;font-weight:900;z-index:71}
 @keyframes ring{0%{transform:scale(.96);box-shadow:0 0 0 0 rgba(37,211,102,.6)}70%{transform:scale(1);box-shadow:0 0 0 15px rgba(37,211,102,0)}100%{transform:scale(.96);box-shadow:0 0 0 0 rgba(37,211,102,0)}}
 @keyframes shine{0%{background-position:200% center}100%{background-position:-200% center}}`;
+    const cardHtml = c => {
+      const tg = tagsOf(c), ph = c.ph || [], ba = ph.length > 0;
+      const bg = c.pn ? `background-image:linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.7)),url('${A(P(c.pn))}')` : "";
+      const vt = `<div class="vt" data-open style="${bg}"><div class="r"><span class="chp">${A(tg[0])}</span>${c.dur ? `<span class="du">${c.dur} ثانية</span>` : ""}</div><div class="pl"><i class="gbg">${PLAY_SVG}</i><span>اضغط للمشاهدة</span></div>${!ba && c.w.excerpt ? `<div class="ex">«${A(c.w.excerpt)}»</div>` : "<div></div>"}</div>`;
+      const media = ba ? `<div class="pair"><div class="ph1" data-zoom style="background-image:url('${A(P(ph[0]))}')">${ph.length > 1 ? `<span class="cnt">+${ph.length - 1}</span>` : ""}</div><div class="arr">←</div>${vt}</div><div class="cap"><span>صورة العميل</span><span>الإعلان</span></div>` : vt;
+      return `<div class="vc${ba ? " ba" : ""}" data-tags="${A(tg.join("|"))}" data-title="${A(c.w.title)}" data-cat="${A(tg.join(" • "))}" data-video="${A(P(c.vn))}"${ba ? ` data-photos="${A(JSON.stringify(ph.map(P)))}"` : ""}>${media}<div class="vi"><h3>${A(c.w.title)}</h3>${ba && c.w.excerpt ? `<p class="q">«${A(c.w.excerpt)}»</p>` : ""}<button data-open>مشاهدة النموذج</button></div></div>`;
+    };
     const logoBox = hasLogo ? `<img src="${P("logo.png")}" alt="${A(brand)}">` : `<svg viewBox="0 0 24 24"><path d="${CAM_PATH}"/></svg>`;
     const html = `<!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -167,10 +184,7 @@ ${o.text ? `<div class="promo">🔥 ${A(o.text)}</div>` : ""}
 </div></section>
 ${cards.length ? `<section id="work" class="alt"><div class="wrap"><div class="sh"><span class="k">شوف الخدمة بعينك</span><h2>نماذج من أعمالنا</h2><p>تصفح أمثلة من الإعلانات التي نصنعها واضغط على أي نموذج للمشاهدة.</p></div>
 <div class="fl"><button class="on" data-f="*">جميع النماذج</button>${tags.map(t => `<button data-f="${A(t)}">${A(t)}</button>`).join("")}</div>
-<div class="sg">${cards.map(c => `<div class="vc" data-tags="${A(tagsOf(c).join("|"))}" data-title="${A(c.w.title)}" data-cat="${A(tagsOf(c).join(" • "))}" data-video="${A(P(c.vn))}">
-<div class="vt" data-open style="${c.pn ? `background-image:linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.7)),url('${A(P(c.pn))}')` : ""}"><div class="r"><span class="chp">${A(tagsOf(c)[0])}</span>${c.dur ? `<span class="du">${c.dur} ثانية</span>` : ""}</div>
-<div class="pl"><i class="gbg">${PLAY_SVG}</i><span>اضغط للمشاهدة</span></div>${c.w.excerpt ? `<div class="ex">«${A(c.w.excerpt)}»</div>` : `<div></div>`}</div>
-<div class="vi"><h3>${A(c.w.title)}</h3><button data-open>مشاهدة النموذج</button></div></div>`).join("")}</div></div></section>` : ""}
+<div class="sg">${cards.map(cardHtml).join("")}</div></div></section>` : ""}
 ${pk.length ? `<section id="prices"><div class="wrap"><div class="sh"><span class="k kb">الباقات والأسعار</span><h2>اختر الباقة المناسبة لك</h2>${o.text ? `<p>${A(o.text)}</p>` : ""}</div>
 <div class="pg">${pk.map(p => { const sp = sale(p, o.d), pr = +p.price || 0, ls = (p.inc || "").split("\n").map(s => s.trim()).filter(Boolean), msg = "سلام، حاب نطلب [" + (p.name || "باقة") + (pr ? " بسعر " + priceTxt(p) : "") + "]" + (o.text ? " مع الاستفادة من العرض (" + o.text + ")." : "."); return `<div class="pk"><div><div class="ph"><div><h3>${A(p.name || "باقة")}</h3>${ls[0] ? `<p>${A(ls[0])}</p>` : ""}</div>${pr ? `<div class="pb">${sp ? `<s>${N(pr)} دج</s>` : ""}<b>${N(sp || pr)} دج</b></div>` : ""}</div>${o.text ? `<div class="of">🎁 ${A(o.text)}</div>` : ""}${ls.length > 1 ? `<ul>${ls.slice(1).map(x => `<li>${A(x)}</li>`).join("")}</ul>` : ""}</div><button class="b wa" data-wa="${A(msg)}">${WA_SVG}<span>اطلب هذه الباقة عبر واتساب</span></button></div>`; }).join("")}</div></div></section>` : ""}
 ${steps.length ? `<section id="steps" class="alt"><div class="wrap"><div class="sh"><span class="k">بكل بساطة</span><h2>كيف نعمل؟</h2></div><div class="st">${steps.map((s, i) => `<div class="sc"><div class="sn ${i % 2 ? "" : "gbg"}"${i % 2 ? ` style="background:var(--acc);color:var(--on)"` : ""}>${i + 1}</div><h3>${A(s.t)}</h3>${s.d ? `<p>${A(s.d)}</p>` : ""}</div>`).join("")}</div></div></section>` : ""}
@@ -186,6 +200,7 @@ ${faq.length ? `<section id="faq"><div class="wrap"><div class="sh"><h2>أسئل
 <div class="fln">${nav.map(n => `<a href="${n[0]}">${n[1]}</a>`).join("")}</div>
 <p class="dis">© ${new Date().getFullYear()} ${A(brand)}${lp.lpDisc === "yes" ? " • الإعلانات المعروضة مُعدّة بمساعدة الذكاء الاصطناعي" : ""}</p></div></footer>
 <button class="fab" data-wa="${A("سلام، حاب نستفسر على إعلان فيديو بالدارجة من " + brand + ".")}" aria-label="واتساب">${WA_SVG}<span>اطلب عبر واتساب</span></button>
+<div id="lb"><button class="lbx" id="lbx" aria-label="إغلاق">✕</button><div id="lbi"></div></div>
 <div id="md"><div class="mb"><div class="mh"><div><h4 id="mt"></h4><span id="mc"></span></div><button class="mx" id="mxb" aria-label="إغلاق">✕</button></div><div id="mw"></div><div class="mf"><span>حاب إعلان كيما هذا؟</span><button id="mo">اطلب مثله عبر واتساب</button></div></div></div>
 <script>
 var PH="${wa}",BR=${JSON.stringify(brand).replace(/</g, "\\u003c")};
@@ -195,6 +210,8 @@ function closeM(){md.classList.remove("on");mw.innerHTML=""}
 document.addEventListener("click",function(e){
 var w=e.target.closest("[data-wa]");if(w){wa(w.getAttribute("data-wa"));return}
 var fb=e.target.closest(".fl button");if(fb){var t=fb.getAttribute("data-f");document.querySelectorAll(".fl button").forEach(function(x){x.classList.toggle("on",x===fb)});document.querySelectorAll(".vc").forEach(function(v){v.hidden=t!=="*"&&v.getAttribute("data-tags").split("|").indexOf(t)<0});return}
+var zm=e.target.closest("[data-zoom]");if(zm){var us=JSON.parse(zm.closest(".vc").getAttribute("data-photos")||"[]");document.getElementById("lbi").innerHTML="<p>صورة العميل الأصلية قبل الإعلان</p>"+us.map(function(u){return '<img src="'+u+'" alt="">'}).join("");document.getElementById("lb").classList.add("on");return}
+if(e.target.closest("#lbx")||e.target.id==="lb"){document.getElementById("lb").classList.remove("on");return}
 var op=e.target.closest("[data-open]");if(op){var c=op.closest(".vc");document.getElementById("mt").textContent=c.getAttribute("data-title");document.getElementById("mc").textContent=c.getAttribute("data-cat");mw.innerHTML="";var v=document.createElement("video");v.src=c.getAttribute("data-video");v.controls=true;v.autoplay=true;v.setAttribute("playsinline","");v.style.cssText="width:100%;height:100%;object-fit:contain;background:#000";mw.appendChild(v);document.getElementById("mo").onclick=function(){closeM();wa('سلام، عجبني نموذج "'+c.getAttribute("data-title")+'" وحاب نطلب إعلان كيما هذا لمتجري.')};md.classList.add("on");return}
 if(e.target===md||e.target.closest("#mxb")){closeM();return}
 if(e.target.closest("#bg")){document.getElementById("mm").classList.toggle("on");return}
@@ -219,7 +236,7 @@ var m="سلام، حاب نطلب إعلان فيديو بالدارجة من *"
   });
   async function renderLanding() {
     let list; try { list = ((await B.getPort()) || []).sort((a, b) => b.created - a.created); } catch (e) { return; }
-    $("#lpVids").innerHTML = list.length ? list.map(w => `<label class="chk"><input type="checkbox" data-lpv="${esc(w.id)}"${biz.unsel.includes(w.id) ? "" : " checked"}><span>${esc(w.title)}</span><span class="chip">${esc((w.tags && w.tags.length ? w.tags : ["إعلان"]).join(" • "))}</span><span class="mut">${(w.blob.size / 1048576).toFixed(1)} MB</span></label>`).join("") : `<p class="mut">احفظ أعمالاً في معرض الأعمال أولاً لتظهر هنا.</p>`;
+    $("#lpVids").innerHTML = list.length ? list.map(w => `<label class="chk"><input type="checkbox" data-lpv="${esc(w.id)}"${biz.unsel.includes(w.id) ? "" : " checked"}><span>${esc(w.title)}</span><span class="chip">${esc((w.tags && w.tags.length ? w.tags : ["إعلان"]).join(" • "))}</span>${w.photos && w.photos.length && w.show !== false ? `<span class="chip">📷 ${w.photos.length}</span>` : ""}<span class="mut">${(w.blob.size / 1048576).toFixed(1)} MB</span></label>`).join("") : `<p class="mut">احفظ أعمالاً في معرض الأعمال أولاً لتظهر هنا.</p>`;
   }
   window.renderLanding = renderLanding;
   $("#lpVids").addEventListener("change", e => {

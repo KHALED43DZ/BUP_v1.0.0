@@ -1,4 +1,4 @@
-const VERSION = "1.9.1";
+const VERSION = "1.10.0";
 const API = "https://generativelanguage.googleapis.com/v1beta/";
 const $ = s => document.querySelector(s);
 const S = {
@@ -123,7 +123,9 @@ async function generate() {
     const txt = j.candidates[0].content.parts.map(p => p.text || "").join("").replace(/```json|```/g, "").trim();
     const d = JSON.parse(txt);
     shots = d.shots; audioBlob = null; dlgMode = f.mode === "dialogue"; resetAudioUI();
-    cur = { id: Date.now().toString(36), created: Date.now(), name: f.name, caption: d.caption || "", thumbs: await Promise.all(files.map(x => imgB64(x, 240, .7))), images: d.images || [], voice: $("#voice").value, form: Object.fromEntries(FIELDS.map(k => [k, $("#" + k).value])) };
+    const thumbsArr = [], photosArr = [];
+    for (const x of files) { thumbsArr.push(await imgB64(x, 240, .7)); photosArr.push(await imgB64(x, 800, .8)); }
+    cur = { id: Date.now().toString(36), created: Date.now(), name: f.name, caption: d.caption || "", thumbs: thumbsArr, photos: photosArr, images: d.images || [], voice: $("#voice").value, form: Object.fromEntries(FIELDS.map(k => [k, $("#" + k).value])) };
     const saved = await saveCur(); S.set("curId", cur.id); renderGallery(cur.thumbs.map(t => "data:image/jpeg;base64," + t), cur.images); renderShots(d); renderProjects(); msg(saved ? "" : "تم إنشاء السيناريو لكن تعذر حفظه في المشاريع: " + (window.__saveErr || ""), !saved);
   } catch (e) { msg("تعذر الإنشاء: " + e.message, true); }
   $("#btnGen").disabled = false;

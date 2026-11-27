@@ -66,3 +66,5 @@ header .icon{padding:2px 8px}
 .chip.ok{color:var(--g);border-color:var(--g)}
 .chk{display:flex;align-items:center;gap:8px;color:var(--ink);margin:6px 0;flex-wrap:wrap}.chk input{width:auto;margin:0}
 .card select{margin:4px 0;padding:4px 8px;font-size:.85rem}
+.phc{margin:6px 0}.phs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.pth{position:relative;display:inline-block}.pth img{width:54px;height:54px;object-fit:cover;border-radius:8px;display:block}.pth button{position:absolute;top:-6px;left:-6px;width:20px;height:20px;border-radius:50%;padding:0;font-size:.65rem;background:#000b;color:#fff}
+.btnl{display:inline-block;padding:4px 10px;background:var(--line);border-radius:6px;font-size:.8rem;cursor:pointer}.btnl input{display:none}.phc .chk{font-size:.8rem;margin:0}
