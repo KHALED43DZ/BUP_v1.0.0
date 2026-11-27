@@ -1,7 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
   const B = window.BIZ; if (!B) return;
   const { biz, offer, sale, num, THEMES, save } = B;
-  const LPD = { lpHead: "إعلانات فيديو بالدارجة لمتجرك", lpSub: "", lpCta: "تواصل معنا على واتساب", lpSteps: "ترسل لنا صور منتجك ومعلوماته\nنجهّز لك نسخة معاينة لتشاهدها\nتؤكد الدفع فنسلمك الإعلان الجاهز", lpFaq: "", lpUrl: "", lpDisc: "yes", lpPrices: "yes" };
+  const N = n => B.num(n).replace(/ /g, "\u00A0");
+  const LPD = { lpHead: "إعلانات فيديو بالدارجة لمتجرك", lpSub: "", lpCta: "تواصل معنا على واتساب", lpSteps: "أرسل صور منتجك | ترسل لنا صور المنتج ومعلوماته والسعر أو العرض الذي تريد الترويج له.\nنجهّز لك معاينة | نكتب لك السيناريو ونجهّز نسخة معاينة لتشاهدها.\nتستلم إعلانك | بعد تأكيد الدفع نسلمك الإعلان الجاهز للنشر.", lpFaq: "", lpUrl: "", lpDisc: "yes", lpPrices: "yes" };
   biz.lp = Object.assign({}, LPD, biz.lp); biz.unsel = biz.unsel || [];
   const lum = h => { const c = parseInt(h.slice(1), 16); return (0.299 * (c >> 16) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255)) / 255; };
   const intl = p => { const d = String(p || "").replace(/[^\d+]/g, ""); if (d.startsWith("+")) return d.slice(1); if (d.startsWith("00")) return d.slice(2); if (/^0\d{9}$/.test(d)) return "213" + d.slice(1); return d; };
@@ -50,9 +51,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Promise(ok => c.toBlob(ok, "image/jpeg", .85));
   }
 
-  /* ---- site builder ---- */
+  /* ---- site builder (design modelled on the reference landing page) ---- */
+  const hex2 = h => { const c = parseInt(h.slice(1), 16); return [c >> 16, (c >> 8) & 255, c & 255]; };
+  const rgba = (h, a) => { const [r, g, b] = hex2(h); return `rgba(${r},${g},${b},${a})`; };
+  const lighten = (h, t) => "#" + hex2(h).map(v => Math.round(v + (255 - v) * t).toString(16).padStart(2, "0")).join("");
+  const WA_PATH = "M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824z", CAM_PATH = "M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4zm-8 12.5v-7l6 3.5-6 3.5z";
+  const WA_SVG = `<svg viewBox="0 0 24 24"><path d="${WA_PATH}"/></svg>`, PLAY_SVG = `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+  const durOf = b => Promise.race([mediaDur(b), new Promise(r => setTimeout(() => r(0), window.__posterTimeout || 4000))]);
+
   async function buildSite(preview) {
-    const f = biz.f, lp = biz.lp, th = THEMES[f.bTheme] || THEMES.green, acc = f.bColor || "#22b573", o = offer();
+    const f = biz.f, lp = biz.lp, th = THEMES[f.bTheme] || THEMES.green, acc = f.bColor || "#22b573", acc2 = lighten(acc, .35), o = offer();
+    const light = f.bTheme === "light", on = lum(acc) > .6 ? "#10190f" : "#ffffff";
     const items = ((await B.getPort()) || []).sort((a, b) => b.created - a.created).filter(w => !biz.unsel.includes(w.id));
     const files = [], urls = {}, warn = []; let total = 0;
     const add = async (name, blob) => { total += blob.size || 0; if (preview) urls[name] = URL.createObjectURL(blob); else files.push({ name, data: new Uint8Array(await blob.arrayBuffer()) }); };
@@ -61,58 +70,138 @@ document.addEventListener("DOMContentLoaded", () => {
       const w = items[i], vn = "videos/ad-" + (i + 1) + ".mp4", pn = "posters/ad-" + (i + 1) + ".jpg";
       await add(vn, w.blob); if (w.blob.size > 8 * 1048576) warn.push(w.title + ": " + (w.blob.size / 1048576).toFixed(1) + " MB");
       const pb = await poster(w.blob); if (pb) await add(pn, pb);
-      cards.push({ w, vn, pn: pb ? pn : "" });
+      cards.push({ w, vn, pn: pb ? pn : "", dur: Math.round(await durOf(w.blob)) });
     }
     if (biz.logo) { try { await add("logo.png", await (await fetch(biz.logo)).blob()); } catch (e) { } }
     await add("og.jpg", await ogBlob());
     const hasLogo = !!(urls["logo.png"] || files.some(x => x.name === "logo.png"));
-    const wa = intl(f.bPhone), waLink = wa ? "https://wa.me/" + wa + "?text=" + encodeURIComponent("السلام عليكم، أريد معرفة تفاصيل خدمة إعلانات الفيديو.") : "#contact";
-    const tags = [...new Set(cards.flatMap(c => c.w.tags && c.w.tags.length ? c.w.tags : ["إعلان"]))];
-    const steps = lp.lpSteps.split("\n").map(s => s.trim()).filter(Boolean);
+    const wa = intl(f.bPhone), brand = f.bName || "خدمة الإعلانات", base = lp.lpUrl ? lp.lpUrl.replace(/\/?$/, "/") : "", desc = lp.lpSub || f.bSlogan || lp.lpHead;
+    const tagsOf = c => (c.w.tags && c.w.tags.length ? c.w.tags : ["إعلان"]);
+    const tags = [...new Set(cards.flatMap(tagsOf))];
+    const steps = lp.lpSteps.split("\n").map(s => s.trim()).filter(Boolean).map(s => { const a = s.split("|").map(x => x.trim()); return { t: a[0], d: a[1] || "" }; });
     const faq = lp.lpFaq.split("\n").map(l => l.split("|").map(s => s.trim())).filter(a => a[0] && a[1]);
-    const pk = biz.pkgs.filter(p => p.name || p.price);
-    const base = lp.lpUrl ? lp.lpUrl.replace(/\/?$/, "/") : "", desc = lp.lpSub || f.bSlogan || lp.lpHead, brand = f.bName || "خدمة الإعلانات";
-    const soc = f.bSocial ? (/^https?:\/\//.test(f.bSocial) ? `<a href="${esc(f.bSocial)}" rel="noopener">${esc(f.bSocial)}</a>` : esc(f.bSocial)) : "";
-    const css = `:root{--a:${th.a};--b:${th.b};--t:${th.t};--m:${th.m};--box:${th.box};--acc:${acc};--on:${lum(acc) > .6 ? "#10190f" : "#fff"}}
-*{box-sizing:border-box}[hidden]{display:none!important}
-body{margin:0;background:linear-gradient(var(--a),var(--b)) fixed;color:var(--t);font:17px/1.8 Cairo,Tahoma,"Segoe UI",system-ui,sans-serif}
-.w{max-width:960px;margin:0 auto;padding:0 18px}.hero{padding:44px 0 26px;text-align:center}
-.logo{width:84px;height:84px;object-fit:contain;border-radius:18px;background:var(--box)}.brand{font-weight:800;font-size:1.2rem}
-h1{font-size:clamp(1.7rem,6vw,2.6rem);line-height:1.35;margin:14px 0 8px}.sub{color:var(--m);max-width:620px;margin:0 auto 20px}
-.btn{display:inline-block;background:var(--acc);color:var(--on);font-weight:800;padding:12px 28px;border-radius:999px;text-decoration:none}
-section{padding:24px 0}h2{font-size:1.5rem;margin:0 0 14px;border-inline-start:5px solid var(--acc);padding-inline-start:10px}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}.chips button{font:inherit;background:var(--box);color:var(--t);border:0;border-radius:999px;padding:2px 16px;cursor:pointer}.chips button.on{background:var(--acc);color:var(--on)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
-.vid{margin:0;background:var(--box);border-radius:14px;overflow:hidden}.vid video{width:100%;display:block;background:#000;aspect-ratio:9/16;object-fit:cover}.vid figcaption{padding:10px 12px}
-.tag{display:inline-block;background:var(--acc);color:var(--on);border-radius:8px;padding:0 8px;font-size:.78rem;margin-inline-end:4px}
-.offer{background:var(--acc);color:var(--on);border-radius:14px;padding:10px 16px;font-weight:800;text-align:center;margin-bottom:14px}
-.pk{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--box);border-radius:14px;padding:14px 16px;margin-bottom:10px;border-inline-start:6px solid var(--acc)}
-.pk small{color:var(--m);display:block}.pr{font-weight:800;color:var(--acc);font-size:1.4rem;white-space:nowrap;text-align:left}.pr s{display:block;color:var(--m);font-size:.9rem;font-weight:400}
-ol{padding-inline-start:22px}li{margin:8px 0}details{background:var(--box);border-radius:12px;padding:10px 14px;margin-bottom:8px}summary{cursor:pointer;font-weight:700}
-a{color:var(--acc)}.btn{color:var(--on)}footer{padding:24px 0 96px;color:var(--m);font-size:.9rem;text-align:center}
-.fab{position:fixed;inset-inline:16px;bottom:14px;z-index:5}.fab .btn{display:block;text-align:center;box-shadow:0 6px 20px #0006}
-@media(min-width:700px){.fab{inset-inline:auto 24px;width:260px}}`;
+    const pk = lp.lpPrices === "yes" ? biz.pkgs.filter(p => p.name || p.price) : [];
+    const typeOpts = [...$("#type").options].map(x => x.textContent).concat("نوع آخر");
+    const A = esc, offerMsg = o.text ? "سلام، حاب نستفيد من العرض (" + o.text + ") ونطلب فيديو إعلاني بالدارجة لمتجري." : "سلام، حاب نطلب فيديو إعلاني بالدارجة لمتجري.";
+    const priceTxt = p => { const sp = sale(p, o.d), pr = +p.price || 0; return pr ? N(sp || pr) + " دج" : ""; };
+    const card = light ? "#ffffff" : "rgba(255,255,255,.055)", line = light ? "rgba(0,0,0,.1)" : "rgba(255,255,255,.1)";
+    const nav = [cards.length && ["#work", "نماذج أعمالنا"], pk.length && ["#prices", "الأسعار"], steps.length && ["#steps", "كيف نعمل"], ["#order", "اطلب إعلانك"]].filter(Boolean);
+    const css = `:root{--bg:${th.b};--bg2:${th.a};--ink:${th.t};--mut:${th.m};--card:${card};--line:${line};--acc:${acc};--acc2:${acc2};--on:${on};--wa:#25D366}
+*{box-sizing:border-box;margin:0}html{scroll-behavior:smooth}[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:Cairo,Tajawal,"Segoe UI",system-ui,sans-serif;line-height:1.7;overflow-x:hidden}
+a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer;border:0;color:inherit}img,video{max-width:100%}
+.wrap{max-width:1120px;margin:0 auto;padding:0 18px}.gt{background:linear-gradient(135deg,var(--acc2),var(--acc));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.gbg{background:linear-gradient(135deg,var(--acc2),var(--acc));color:var(--on)}
+header{position:fixed;top:0;left:0;right:0;z-index:40;background:${rgba(th.b, .86)};-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+header .bar{height:4px;background:var(--acc)}.nav{display:flex;align-items:center;justify-content:space-between;height:72px}
+.ls{display:flex;align-items:center;gap:12px}.lbox{width:46px;height:46px;border-radius:14px;border:1px solid ${rgba(acc, .4)};background:var(--card);display:grid;place-items:center;overflow:hidden}.lbox img{width:100%;height:100%;object-fit:contain;padding:3px}.lbox svg{width:26px;height:26px;fill:currentColor}
+.bn{font-size:1.4rem;font-weight:900;line-height:1}.bt{font-size:.72rem;color:var(--mut);margin-top:4px}
+nav.dt{display:none;gap:28px;font-weight:700;font-size:.92rem;color:var(--mut)}nav.dt a:hover{color:var(--acc)}
+.wab{display:none;align-items:center;gap:8px;background:var(--wa);color:#04210f;font-weight:900;border-radius:12px;padding:9px 18px;font-size:.9rem}.wab svg{width:16px;height:16px;fill:currentColor}
+.burger{width:44px;height:44px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:1.3rem}.right{display:flex;align-items:center;gap:12px}
+#mm{display:none;background:${rgba(th.b, .97)};border-bottom:1px solid var(--line);padding:8px 18px 18px}#mm.on{display:block}#mm a{display:block;padding:11px 14px;border-radius:12px;font-weight:700;color:var(--mut)}
+@media(min-width:768px){nav.dt{display:flex}.burger,#mm{display:none!important}}@media(min-width:640px){.wab{display:inline-flex}}
+.hero{padding:128px 0 64px;text-align:center;background:radial-gradient(circle at 50% 12%,${rgba(acc, .2)},transparent 55%),radial-gradient(circle at 82% 40%,${rgba(acc2, .13)},transparent 50%)}
+.lc{display:inline-flex;flex-direction:column;align-items:center;padding:14px 22px;border-radius:24px;background:var(--card);border:1px solid ${rgba(acc, .3)};box-shadow:0 20px 50px ${rgba(acc, .12)};margin-bottom:22px}.lc img{height:104px;width:auto;object-fit:contain}
+.fb{display:flex;align-items:center;gap:12px}.ic{width:52px;height:52px;border-radius:16px;display:grid;place-items:center}.ic svg{width:30px;height:30px;fill:currentColor}.nm{font-size:2.3rem;font-weight:900}
+.pill{margin-top:10px;padding:2px 16px;border-radius:999px;border:1px solid ${rgba(acc, .4)};font-size:.8rem;font-weight:800;color:var(--acc2)}
+h1{font-size:clamp(1.9rem,6.5vw,3.5rem);font-weight:900;line-height:1.25;color:var(--acc);margin-bottom:12px;text-shadow:0 2px 18px ${rgba(acc, .35)}}
+.t1{font-size:clamp(1.1rem,3.2vw,1.6rem);font-weight:800;margin-bottom:10px}.lead{max-width:680px;margin:0 auto 28px;color:var(--mut);font-size:1.05rem}
+.promo{max-width:780px;margin:0 auto 32px;padding:12px 24px;border-radius:999px;font-weight:900;font-size:clamp(.95rem,2.4vw,1.25rem);color:var(--on);background:linear-gradient(90deg,var(--acc),var(--acc2),var(--acc));background-size:200% auto;animation:shine 4s linear infinite;box-shadow:0 18px 40px ${rgba(acc, .3)}}
+.cta{display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center}@media(min-width:640px){.cta{flex-direction:row}}
+.b{display:inline-flex;align-items:center;justify-content:center;gap:10px;border-radius:16px;font-weight:900;padding:15px 30px;font-size:1.05rem;transition:.2s;width:100%}@media(min-width:640px){.b{width:auto}}
+.b svg{width:24px;height:24px;fill:currentColor}.b.wa{background:var(--wa);color:#04210f;animation:ring 2.4s infinite}.b.wa:hover{filter:brightness(1.1)}
+.b.gh{background:var(--card);border:1px solid ${rgba(acc, .4)};color:var(--ink)}.b.gh i{width:28px;height:28px;border-radius:50%;display:grid;place-items:center}.b.gh svg{width:16px;height:16px}
+section{padding:72px 0;border-top:1px solid var(--line)}.alt{background:${light ? "rgba(0,0,0,.025)" : "rgba(255,255,255,.025)"}}
+.sh{text-align:center;max-width:720px;margin:0 auto 40px}.k{display:inline-block;font-weight:800;font-size:.85rem;color:var(--acc);margin-bottom:6px}.kb{padding:2px 16px;border-radius:999px;background:${rgba(acc, .14)}}
+h2{font-size:clamp(1.6rem,4.5vw,2.3rem);font-weight:900;line-height:1.3}.sh p{color:var(--mut);margin-top:8px}
+.pg{display:grid;gap:26px}@media(min-width:768px){.pg{grid-template-columns:1fr 1fr}}
+.pk{position:relative;border-radius:26px;background:var(--card);border:1px solid var(--line);padding:30px 34px 30px 30px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;transition:.25s}.pk:hover{border-color:${rgba(acc, .6)}}
+.pk:before{content:"";position:absolute;top:0;bottom:0;right:0;width:8px;background:var(--acc)}
+.ph{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}.ph h3{font-size:1.5rem;font-weight:900;line-height:1.3}.ph p{color:var(--mut);margin-top:4px}
+.pb{flex:none;text-align:left;border-radius:16px;padding:8px 16px;background:${rgba(th.b, .55)};border:1px solid var(--line)}.pb s{display:block;color:var(--mut);font-weight:700}.pb b{display:block;font-size:1.8rem;font-weight:900;color:var(--acc);line-height:1.2;white-space:nowrap}
+.of{margin-bottom:18px;padding:10px 14px;border-radius:12px;background:${rgba(acc, .14)};border:1px solid ${rgba(acc, .4)};font-weight:800;font-size:.92rem}
+.pk ul{list-style:none;padding:0;margin:0 0 26px;display:grid;gap:10px;color:var(--mut);font-size:.95rem}.pk li:before{content:"✓";color:var(--acc);font-weight:900;margin-inline-end:10px}
+.pk .b{width:100%;padding:14px 14px;font-size:.98rem}
+.fl{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:36px}.fl button{padding:9px 20px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-weight:700;color:var(--mut)}.fl button.on{background:var(--acc);color:var(--on);border-color:transparent;font-weight:800;box-shadow:0 8px 20px ${rgba(acc, .25)}}
+.sg{display:flex;flex-wrap:wrap;justify-content:center;gap:22px}.vc{flex:1 1 100%;max-width:100%}@media(min-width:560px){.vc{flex:0 1 calc(50% - 11px)}}@media(min-width:960px){.vc{flex:0 1 calc(25% - 17px)}}
+.vc{border-radius:24px;background:var(--card);border:1px solid var(--line);overflow:hidden;display:flex;flex-direction:column;transition:.25s}.vc:hover{border-color:${rgba(acc, .6)}}
+.vt{position:relative;aspect-ratio:9/14;padding:16px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;background:linear-gradient(160deg,${rgba(acc, .35)},var(--bg2) 60%,var(--bg));background-size:cover;background-position:center;color:#fff}
+.vt .r{display:flex;justify-content:space-between;gap:8px}.chp{padding:2px 12px;border-radius:999px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);font-size:.75rem;font-weight:800;color:var(--acc2)}.du{padding:2px 10px;border-radius:8px;background:var(--acc);color:var(--on);font-size:.75rem;font-weight:900}
+.pl{margin:auto;display:grid;justify-items:center;gap:8px}.pl i{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;box-shadow:0 10px 30px #0006;transition:.2s;color:var(--on)}.vc:hover .pl i{transform:scale(1.1)}.pl i svg{width:30px;height:30px;fill:currentColor}.pl span{font-size:.75rem;font-weight:800;background:rgba(0,0,0,.55);padding:2px 14px;border-radius:999px}
+.ex{background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:10px 12px;border-radius:16px;font-size:.78rem;line-height:1.6}
+.vi{padding:18px}.vi h3{font-size:1.1rem;font-weight:900}.vi button{margin-top:12px;width:100%;padding:10px;border-radius:12px;background:var(--bg);font-weight:800;font-size:.9rem;color:var(--ink)}.vi button:hover{background:var(--acc);color:var(--on)}
+.st{display:grid;gap:24px}@media(min-width:768px){.st{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}}
+.sc{padding:30px;border-radius:24px;background:var(--card);border:1px solid var(--line)}.sn{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;font-size:1.5rem;font-weight:900;margin-bottom:18px}.sc h3{font-size:1.2rem;font-weight:900;margin-bottom:8px}.sc p{color:var(--mut);font-size:.92rem}
+.fq{max-width:760px;margin:0 auto;display:grid;gap:10px}.fq details{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 18px}.fq summary{cursor:pointer;font-weight:800}.fq p{color:var(--mut);margin-top:8px}
+.fm{max-width:760px;margin:0 auto;border-radius:26px;background:var(--card);border:1px solid var(--line);padding:34px 30px 30px;position:relative;overflow:hidden;box-shadow:0 25px 60px #0003}.fm:before{content:"";position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.fm .g{display:grid;gap:18px;margin-bottom:18px}@media(min-width:640px){.fm .g{grid-template-columns:1fr 1fr}}.fm label{display:block;font-weight:800;font-size:.9rem;margin-bottom:6px}
+.fm input,.fm select,.fm textarea{width:100%;padding:13px 14px;border-radius:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);font:inherit}.fm input:focus,.fm select:focus,.fm textarea:focus{outline:2px solid var(--acc)}.fm .b{width:100%;margin-top:18px}
+footer{padding:56px 0 96px;border-top:2px solid ${rgba(acc, .5)};text-align:center}.fn{display:inline-flex;gap:12px;align-items:center;font-size:clamp(1.5rem,4vw,2rem);font-weight:900}.fn small{color:var(--acc2);font-size:1.1rem}
+.fbr{font-weight:800;color:var(--mut);margin:14px 0 22px}.fln{display:flex;flex-wrap:wrap;justify-content:center;gap:22px;color:var(--mut);font-size:.88rem;border-top:1px solid var(--line);padding-top:22px}.dis{margin-top:16px;color:var(--mut);font-size:.82rem}
+.fab{position:fixed;bottom:20px;left:20px;z-index:40;display:flex;align-items:center;gap:10px;background:var(--wa);color:#04210f;font-weight:900;padding:13px 16px;border-radius:999px;box-shadow:0 14px 34px #0007;animation:ring 2.4s infinite}.fab svg{width:26px;height:26px;fill:currentColor}.fab span{display:none;font-size:.9rem}@media(min-width:640px){.fab span{display:inline}}
+#md{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.85);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:16px}#md.on{display:flex}
+.mb{width:100%;max-width:420px;background:var(--bg2);border:1px solid var(--line);border-radius:24px;overflow:hidden}.mh{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}.mh h4{font-weight:900}.mh span{font-size:.75rem;font-weight:800;color:var(--acc2)}
+.mx{width:36px;height:36px;border-radius:50%;background:var(--bg)}.mx:hover{background:var(--acc);color:var(--on)}#mw{aspect-ratio:9/16;max-height:62vh;width:100%;background:#000;margin:0 auto}.mf{padding:14px;background:var(--bg);display:flex;justify-content:space-between;align-items:center;gap:10px}.mf span{font-size:.78rem;font-weight:700;color:var(--mut)}.mf button{padding:9px 14px;border-radius:12px;background:var(--wa);color:#04210f;font-weight:900;font-size:.78rem}
+@keyframes ring{0%{transform:scale(.96);box-shadow:0 0 0 0 rgba(37,211,102,.6)}70%{transform:scale(1);box-shadow:0 0 0 15px rgba(37,211,102,0)}100%{transform:scale(.96);box-shadow:0 0 0 0 rgba(37,211,102,0)}}
+@keyframes shine{0%{background-position:200% center}100%{background-position:-200% center}}`;
+    const logoBox = hasLogo ? `<img src="${P("logo.png")}" alt="${A(brand)}">` : `<svg viewBox="0 0 24 24"><path d="${CAM_PATH}"/></svg>`;
     const html = `<!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(brand)} – ${esc(lp.lpHead)}</title><meta name="description" content="${esc(desc)}">
-<meta property="og:type" content="website"><meta property="og:title" content="${esc(brand + " – " + lp.lpHead)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:image" content="${esc(base ? base + "og.jpg" : P("og.jpg"))}">
-<meta name="theme-color" content="${th.a}"><link rel="icon" href="${hasLogo ? P("logo.png") : "data:,"}">
+<title>${A(brand)} | ${A(lp.lpHead)}</title><meta name="description" content="${A(desc)}">
+<meta property="og:type" content="website"><meta property="og:title" content="${A(brand + " | " + lp.lpHead)}"><meta property="og:description" content="${A(desc)}"><meta property="og:image" content="${A(base ? base + "og.jpg" : P("og.jpg"))}">
+<meta name="theme-color" content="${th.b}"><link rel="icon" href="${hasLogo ? P("logo.png") : "data:,"}">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 <style>${css}</style></head><body>
-<header class="hero"><div class="w">${hasLogo ? `<img class="logo" src="${P("logo.png")}" alt="${esc(brand)}">` : ""}<div class="brand">${esc(brand)}</div>
-<h1>${esc(lp.lpHead)}</h1>${lp.lpSub ? `<p class="sub">${esc(lp.lpSub)}</p>` : ""}<a class="btn" href="${esc(waLink)}">${esc(lp.lpCta)}</a></div></header>
-<main class="w">
-${cards.length ? `<section id="work"><h2>أعمالنا</h2>
-<div class="chips"><button class="on" data-f="*">الكل</button>${tags.map(t => `<button data-f="${esc(t)}">${esc(t)}</button>`).join("")}</div>
-<div class="grid">${cards.map(c => `<figure class="vid" data-tags="${esc((c.w.tags && c.w.tags.length ? c.w.tags : ["إعلان"]).join("|"))}"><video controls playsinline preload="none"${c.pn ? ` poster="${P(c.pn)}"` : ""}><source src="${P(c.vn)}" type="video/mp4"></video><figcaption>${(c.w.tags && c.w.tags.length ? c.w.tags : ["إعلان"]).map(t => `<span class="tag">${esc(t)}</span>`).join("")}<div>${esc(c.w.title)}</div></figcaption></figure>`).join("")}</div></section>` : ""}
-${lp.lpPrices === "yes" && pk.length ? `<section id="prices"><h2>الباقات والأسعار</h2>${o.text ? `<div class="offer">${esc(o.text)}</div>` : ""}${pk.map(p => { const sp = sale(p, o.d), pr = +p.price || 0; return `<div class="pk"><div><b>${esc(p.name || "باقة")}</b>${p.inc ? `<small>${esc(p.inc)}</small>` : ""}</div><div class="pr">${pr ? (sp ? `<s>${num(pr)} دج</s>${num(sp)} دج` : `${num(pr)} دج`) : "اتصل للسعر"}</div></div>`; }).join("")}</section>` : ""}
-${steps.length ? `<section id="steps"><h2>كيف نعمل</h2><ol>${steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol></section>` : ""}
-${faq.length ? `<section id="faq"><h2>أسئلة شائعة</h2>${faq.map(a => `<details><summary>${esc(a[0])}</summary><p>${esc(a[1])}</p></details>`).join("")}</section>` : ""}
-<section id="contact"><h2>تواصل معنا</h2><p>${f.bPhone ? `واتساب: <a href="${esc(waLink)}" dir="ltr">${esc(f.bPhone)}</a><br>` : ""}${soc ? soc + "<br>" : ""}${f.bArea ? esc(f.bArea) : ""}</p><a class="btn" href="${esc(waLink)}">${esc(lp.lpCta)}</a></section>
-</main>
-<footer><div class="w">© ${new Date().getFullYear()} ${esc(brand)}${lp.lpDisc === "yes" ? "<br>الإعلانات المعروضة مُعدّة بمساعدة الذكاء الاصطناعي." : ""}</div></footer>
-<div class="fab"><a class="btn" href="${esc(waLink)}">${esc(lp.lpCta)}</a></div>
-<script>document.querySelectorAll("[data-f]").forEach(function(b){b.onclick=function(){var t=b.dataset.f;document.querySelectorAll("[data-f]").forEach(function(x){x.classList.toggle("on",x===b)});document.querySelectorAll(".vid").forEach(function(v){v.hidden=t!=="*"&&v.dataset.tags.split("|").indexOf(t)<0})}})</script>
-</body></html>`;
+<header><div class="bar"></div><div class="wrap"><div class="nav">
+<a href="#" class="ls"><div class="lbox ${hasLogo ? "" : "gbg"}">${logoBox}</div><div><div class="bn gt">${A(brand)}</div>${f.bSlogan ? `<div class="bt">${A(f.bSlogan)}</div>` : ""}</div></a>
+<nav class="dt">${nav.map(n => `<a href="${n[0]}">${n[1]}</a>`).join("")}</nav>
+<div class="right"><button class="wab" data-wa="${A("سلام، شفت صفحة " + brand + " وحاب نستفسر على إعلان فيديو بالدارجة لمتجري.")}">${WA_SVG}<span>تواصل عبر واتساب</span></button><button class="burger" id="bg" aria-label="القائمة">☰</button></div>
+</div></div><div id="mm">${nav.map(n => `<a href="${n[0]}">${n[1]}</a>`).join("")}</div></header>
+<section class="hero" style="border:0"><div class="wrap">
+<div class="lc">${hasLogo ? `<img src="${P("logo.png")}" alt="${A(brand)}">` : `<div class="fb"><div class="ic gbg"><svg viewBox="0 0 24 24"><path d="${CAM_PATH}"/></svg></div><span class="nm gt">${A(brand)}</span></div>`}${f.bSlogan ? `<div class="pill">${A(f.bSlogan)}</div>` : ""}</div>
+<h1>${A(lp.lpHead)}</h1>${f.bSlogan ? `<p class="t1">${A(f.bSlogan)}</p>` : ""}${lp.lpSub ? `<p class="lead">${A(lp.lpSub)}</p>` : ""}
+${o.text ? `<div class="promo">🔥 ${A(o.text)}</div>` : ""}
+<div class="cta"><button class="b wa" data-wa="${A(offerMsg)}">${WA_SVG}<span>${A(lp.lpCta)}</span></button>${cards.length ? `<a class="b gh" href="#work"><i class="gbg">${PLAY_SVG}</i><span>شاهد النماذج</span></a>` : ""}</div>
+</div></section>
+${cards.length ? `<section id="work" class="alt"><div class="wrap"><div class="sh"><span class="k">شوف الخدمة بعينك</span><h2>نماذج من أعمالنا</h2><p>تصفح أمثلة من الإعلانات التي نصنعها واضغط على أي نموذج للمشاهدة.</p></div>
+<div class="fl"><button class="on" data-f="*">جميع النماذج</button>${tags.map(t => `<button data-f="${A(t)}">${A(t)}</button>`).join("")}</div>
+<div class="sg">${cards.map(c => `<div class="vc" data-tags="${A(tagsOf(c).join("|"))}" data-title="${A(c.w.title)}" data-cat="${A(tagsOf(c).join(" • "))}" data-video="${A(P(c.vn))}">
+<div class="vt" data-open style="${c.pn ? `background-image:linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.7)),url('${A(P(c.pn))}')` : ""}"><div class="r"><span class="chp">${A(tagsOf(c)[0])}</span>${c.dur ? `<span class="du">${c.dur} ثانية</span>` : ""}</div>
+<div class="pl"><i class="gbg">${PLAY_SVG}</i><span>اضغط للمشاهدة</span></div>${c.w.excerpt ? `<div class="ex">«${A(c.w.excerpt)}»</div>` : `<div></div>`}</div>
+<div class="vi"><h3>${A(c.w.title)}</h3><button data-open>مشاهدة النموذج</button></div></div>`).join("")}</div></div></section>` : ""}
+${pk.length ? `<section id="prices"><div class="wrap"><div class="sh"><span class="k kb">الباقات والأسعار</span><h2>اختر الباقة المناسبة لك</h2>${o.text ? `<p>${A(o.text)}</p>` : ""}</div>
+<div class="pg">${pk.map(p => { const sp = sale(p, o.d), pr = +p.price || 0, ls = (p.inc || "").split("\n").map(s => s.trim()).filter(Boolean), msg = "سلام، حاب نطلب [" + (p.name || "باقة") + (pr ? " بسعر " + priceTxt(p) : "") + "]" + (o.text ? " مع الاستفادة من العرض (" + o.text + ")." : "."); return `<div class="pk"><div><div class="ph"><div><h3>${A(p.name || "باقة")}</h3>${ls[0] ? `<p>${A(ls[0])}</p>` : ""}</div>${pr ? `<div class="pb">${sp ? `<s>${N(pr)} دج</s>` : ""}<b>${N(sp || pr)} دج</b></div>` : ""}</div>${o.text ? `<div class="of">🎁 ${A(o.text)}</div>` : ""}${ls.length > 1 ? `<ul>${ls.slice(1).map(x => `<li>${A(x)}</li>`).join("")}</ul>` : ""}</div><button class="b wa" data-wa="${A(msg)}">${WA_SVG}<span>اطلب هذه الباقة عبر واتساب</span></button></div>`; }).join("")}</div></div></section>` : ""}
+${steps.length ? `<section id="steps" class="alt"><div class="wrap"><div class="sh"><span class="k">بكل بساطة</span><h2>كيف نعمل؟</h2></div><div class="st">${steps.map((s, i) => `<div class="sc"><div class="sn ${i % 2 ? "" : "gbg"}"${i % 2 ? ` style="background:var(--acc);color:var(--on)"` : ""}>${i + 1}</div><h3>${A(s.t)}</h3>${s.d ? `<p>${A(s.d)}</p>` : ""}</div>`).join("")}</div></div></section>` : ""}
+${faq.length ? `<section id="faq"><div class="wrap"><div class="sh"><h2>أسئلة شائعة</h2></div><div class="fq">${faq.map(a => `<details><summary>${A(a[0])}</summary><p>${A(a[1])}</p></details>`).join("")}</div></div></section>` : ""}
+<section id="order" class="alt"><div class="wrap"><form class="fm" id="of"><div class="sh" style="margin-bottom:26px"><span class="k kb">تواصل مباشر وسريع</span><h2>جهّز طلبك وأرسله عبر واتساب</h2><p>املأ البيانات التالية وستفتح محادثة واتساب برسالة جاهزة ومنظمة.</p></div>
+<div class="g"><div><label for="sn">اسم المتجر أو النشاط</label><input id="sn" required placeholder="مثال: متجر الأناقة"></div>
+<div><label for="sp">الباقة المختارة</label><select id="sp">${pk.length ? pk.map(p => `<option value="${A((p.name || "باقة") + (priceTxt(p) ? " بسعر " + priceTxt(p) : ""))}">${A((p.name || "باقة") + (priceTxt(p) ? " — " + priceTxt(p) : ""))}</option>`).join("") : `<option value="لم أحدد بعد">لم أحدد بعد</option>`}</select></div></div>
+<div class="g" style="grid-template-columns:1fr"><div><label for="st2">نوع الإعلان المطلوب</label><select id="st2">${typeOpts.map(t => `<option>${A(t)}</option>`).join("")}</select></div>
+<div><label for="sx">تفاصيل إضافية (اختياري)</label><textarea id="sx" rows="3" placeholder="اكتب لنا نبذة قصيرة عن المنتج أو العرض الذي تريد الإعلان عنه..."></textarea></div></div>
+<button class="b wa" type="submit">${WA_SVG}<span>إرسال الطلب إلى واتساب${f.bPhone ? " (" + A(f.bPhone) + ")" : ""}</span></button></form></div></section>
+<footer><div class="wrap">${f.bPhone ? `<a class="fn" href="https://wa.me/${wa}" dir="ltr"><span>${A(f.bPhone)}</span><small dir="rtl">:واتساب</small></a>` : ""}
+<p class="fbr">${A(brand)}${f.bArea ? " • " + A(f.bArea) : ""}</p>${f.bSocial ? `<p class="fbr" style="margin-top:-12px">${/^https?:\/\//.test(f.bSocial) ? `<a href="${A(f.bSocial)}" rel="noopener">${A(f.bSocial)}</a>` : A(f.bSocial)}</p>` : ""}
+<div class="fln">${nav.map(n => `<a href="${n[0]}">${n[1]}</a>`).join("")}</div>
+<p class="dis">© ${new Date().getFullYear()} ${A(brand)}${lp.lpDisc === "yes" ? " • الإعلانات المعروضة مُعدّة بمساعدة الذكاء الاصطناعي" : ""}</p></div></footer>
+<button class="fab" data-wa="${A("سلام، حاب نستفسر على إعلان فيديو بالدارجة من " + brand + ".")}" aria-label="واتساب">${WA_SVG}<span>اطلب عبر واتساب</span></button>
+<div id="md"><div class="mb"><div class="mh"><div><h4 id="mt"></h4><span id="mc"></span></div><button class="mx" id="mxb" aria-label="إغلاق">✕</button></div><div id="mw"></div><div class="mf"><span>حاب إعلان كيما هذا؟</span><button id="mo">اطلب مثله عبر واتساب</button></div></div></div>
+<script>
+var PH="${wa}",BR=${JSON.stringify(brand).replace(/</g, "\\u003c")};
+function wa(t){window.open("https://wa.me/"+PH+"?text="+encodeURIComponent(t),"_blank","noopener")}
+var md=document.getElementById("md"),mw=document.getElementById("mw");
+function closeM(){md.classList.remove("on");mw.innerHTML=""}
+document.addEventListener("click",function(e){
+var w=e.target.closest("[data-wa]");if(w){wa(w.getAttribute("data-wa"));return}
+var fb=e.target.closest(".fl button");if(fb){var t=fb.getAttribute("data-f");document.querySelectorAll(".fl button").forEach(function(x){x.classList.toggle("on",x===fb)});document.querySelectorAll(".vc").forEach(function(v){v.hidden=t!=="*"&&v.getAttribute("data-tags").split("|").indexOf(t)<0});return}
+var op=e.target.closest("[data-open]");if(op){var c=op.closest(".vc");document.getElementById("mt").textContent=c.getAttribute("data-title");document.getElementById("mc").textContent=c.getAttribute("data-cat");mw.innerHTML="";var v=document.createElement("video");v.src=c.getAttribute("data-video");v.controls=true;v.autoplay=true;v.setAttribute("playsinline","");v.style.cssText="width:100%;height:100%;object-fit:contain;background:#000";mw.appendChild(v);document.getElementById("mo").onclick=function(){closeM();wa('سلام، عجبني نموذج "'+c.getAttribute("data-title")+'" وحاب نطلب إعلان كيما هذا لمتجري.')};md.classList.add("on");return}
+if(e.target===md||e.target.closest("#mxb")){closeM();return}
+if(e.target.closest("#bg")){document.getElementById("mm").classList.toggle("on");return}
+if(e.target.closest("#mm a")){document.getElementById("mm").classList.remove("on")}});
+document.getElementById("of").addEventListener("submit",function(e){e.preventDefault();var n=document.getElementById("sx").value.trim();
+var m="سلام، حاب نطلب إعلان فيديو بالدارجة من *"+BR+"*:\\n• اسم المتجر/النشاط: "+document.getElementById("sn").value.trim()+"\\n• الباقة: "+document.getElementById("sp").value+"\\n• نوع الإعلان: "+document.getElementById("st2").value;if(n)m+="\\n• تفاصيل إضافية: "+n;wa(m)});
+</script></body></html>`;
     if (!preview) {
       const enc = new TextEncoder();
       files.unshift({ name: "index.html", data: enc.encode(html) });
@@ -158,14 +247,14 @@ ${faq.length ? `<section id="faq"><h2>أسئلة شائعة</h2>${faq.map(a => `
     try {
       const prompt = `You write landing-page copy in Arabic (professional tone with a light Algerian touch) for a small service that makes short video ads in Algerian Darija for shops and small businesses in Algeria.
 Brand: ${f.bName || "-"}. Slogan: ${f.bSlogan || "-"}. Coverage: ${f.bArea || "-"}. Packages: ${pk || "-"}.
-Return ONLY JSON: {"headline":string (max 9 words),"sub":string (max 25 words),"steps":[3 or 4 short strings],"faq":[{"q":string,"a":string}] (3 or 4 items)}.
+Return ONLY JSON: {"headline":string (max 9 words),"sub":string (max 25 words),"steps":[{"t":string (short title),"d":string (one short sentence)}] (3 or 4 items),"faq":[{"q":string,"a":string}] (3 or 4 items)}.
 Rules: never invent statistics, client counts, testimonials, guarantees, prices or delivery times. Where a detail is unknown, answer in general terms such as "نتفق عليه حسب طلبك". The real workflow is: the client sends photos and product details, receives a preview version, confirms payment, then receives the final video.`;
       const model = $("#mText").value || "gemini-2.5-flash";
       const j = await withKeys("kText", k => gem(`models/${model}:generateContent`, { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: .7 } }, k));
       const d = JSON.parse(j.candidates[0].content.parts.map(p => p.text || "").join("").replace(/```json|```/g, "").trim());
       const set = (id, v) => { biz.lp[id] = v; $("#" + id).value = v; };
       if (d.headline) set("lpHead", d.headline); if (d.sub) set("lpSub", d.sub);
-      if (Array.isArray(d.steps)) set("lpSteps", d.steps.join("\n"));
+      if (Array.isArray(d.steps)) set("lpSteps", d.steps.map(x => typeof x === "string" ? x : x.t + " | " + (x.d || "")).join("\n"));
       if (Array.isArray(d.faq)) set("lpFaq", d.faq.map(x => x.q + " | " + x.a).join("\n"));
       save(); lpMsg("تمت الكتابة. راجع النصوص وعدّلها بما يطابق سياستك قبل التصدير.");
     } catch (e) { lpMsg("تعذر الاقتراح: " + errText(e), true); }

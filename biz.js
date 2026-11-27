@@ -205,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#btnPort").onclick = async () => {
     const it = (window.__last || {}).prev || (window.__last || {}).out; if (!it) return;
     const title = prompt("عنوان العمل في المعرض:", it.name.replace(/_(preview|original)\.mp4$/, "")); if (title === null) return;
-    try { await W.put({ id: Date.now().toString(36), title: title || "عمل", created: Date.now(), blob: it.blob, name: it.name, tags: [$("#portType").value || "أخرى", ...(dlgMode ? ["حوار"] : [])] }); msg("تم الحفظ في معرض الأعمال."); setTimeout(() => msg(""), 2000); renderPort(); }
+    try { await W.put({ id: Date.now().toString(36), title: title || "عمل", created: Date.now(), blob: it.blob, name: it.name, tags: [$("#portType").value || "أخرى", ...(dlgMode ? ["حوار"] : [])], excerpt: ((cur && cur.shots && cur.shots[0] && cur.shots[0].voiceover) || "").slice(0, 120) }); msg("تم الحفظ في معرض الأعمال."); setTimeout(() => msg(""), 2000); renderPort(); }
     catch (err) { msg("تعذر الحفظ: " + errText(err), true); }
   };
   window.BIZ = { biz, offer, sale, num, THEMES, save, getPort: async () => (await W.all()) || [] };
